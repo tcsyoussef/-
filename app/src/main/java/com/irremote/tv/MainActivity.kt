@@ -1,10 +1,12 @@
 package com.irremote.tv
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
 import com.irremote.tv.databinding.ActivityMainBinding
@@ -18,7 +20,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
     private lateinit var transmitter: IrTransmitter
-    private var selectedBrand: TvBrand = TvBrand.SAMSUNG
+    private var selectedBrand: TvBrand = TvBrand.HAIER
+    private var warnedMissingIr = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,15 +32,24 @@ class MainActivity : AppCompatActivity() {
         setupStatus()
         setupBrandSpinner()
         bindButtons()
+
+        if (!transmitter.hasBuiltInEmitter) {
+            showMissingIrDialog()
+        }
     }
 
     private fun setupStatus() {
-        binding.statusText.text = if (transmitter.hasBuiltInEmitter) {
-            getString(R.string.status_ir_available)
+        if (transmitter.hasBuiltInEmitter) {
+            binding.statusText.text = getString(R.string.status_ir_available)
+            binding.statusText.setTextColor(getColor(R.color.accent_teal))
+            binding.usbStatusText.text = getString(R.string.status_aim_tv)
+            binding.usbStatusText.setTextColor(getColor(R.color.text_muted))
         } else {
-            getString(R.string.status_ir_unavailable)
+            binding.statusText.text = getString(R.string.status_ir_unavailable)
+            binding.statusText.setTextColor(getColor(R.color.accent_red))
+            binding.usbStatusText.text = getString(R.string.status_need_ir_phone)
+            binding.usbStatusText.setTextColor(getColor(R.color.accent_amber))
         }
-        binding.usbStatusText.text = getString(R.string.status_usb_ir_untested)
     }
 
     private fun setupBrandSpinner() {
@@ -49,6 +61,9 @@ class MainActivity : AppCompatActivity() {
         ).also { adapter ->
             adapter.setDropDownViewResource(R.layout.spinner_dropdown_item)
         }
+        // Default to Haier (first item)
+        binding.brandSpinner.setSelection(0)
+        selectedBrand = TvBrand.HAIER
         binding.brandSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
                 parent: AdapterView<*>?,
@@ -98,17 +113,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendCommand(command: RemoteCommand, button: MaterialButton) {
+        if (!transmitter.hasBuiltInEmitter) {
+            if (!warnedMissingIr) {
+                showMissingIrDialog()
+            } else {
+                Toast.makeText(this, R.string.status_need_ir_phone, Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+
         when (val result = transmitter.transmit(selectedBrand, command)) {
             is TransmitResult.Sent -> {
-                val mode = if (result.simulated) "simulated" else "transmitted"
-                val message = "${selectedBrand.displayName} ${command.label} ($mode)"
+                val message = "${selectedBrand.displayName} ${command.label} (IR sent)"
                 binding.lastCommandText.text = getString(R.string.last_command, message)
+                binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
                 button.isPressed = true
                 button.postDelayed({ button.isPressed = false }, 120)
             }
             is TransmitResult.Failed -> {
-                Toast.makeText(this, result.reason, Toast.LENGTH_SHORT).show()
+                binding.lastCommandText.text = result.reason
+                binding.lastCommandText.setTextColor(Color.parseColor("#F87171"))
+                Toast.makeText(this, result.reason, Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun showMissingIrDialog() {
+        warnedMissingIr = true
+        AlertDialog.Builder(this)
+            .setTitle(R.string.no_ir_title)
+            .setMessage(R.string.no_ir_message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 }

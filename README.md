@@ -1,24 +1,32 @@
 # IR TV Remote
 
+Real infrared remote for Android phones that have a **built-in IR blaster**.
+
 ## APK
 
-**Installable signed APK:** [`dist/IR-TV-Remote.apk`](dist/IR-TV-Remote.apk)
+**Download:** [`dist/IR-TV-Remote.apk`](dist/IR-TV-Remote.apk)
+
+https://github.com/tcsyoussef/-/raw/cursor/ir-tv-remote-apk-9168/dist/IR-TV-Remote.apk
 
 ```bash
 adb install -r dist/IR-TV-Remote.apk
 ```
 
-Package: `com.irremote.tv` · minSdk 24 · targetSdk 34
+## How to use on your phone
 
-## Build from source
+1. Install the APK on a phone **with built-in IR** (infrared LED).
+2. Open the app — it should say **IR blaster ready**.
+3. Select **Haier** (default). If Power does nothing, try **Haier Alt**.
+4. Point the phone’s IR LED at the TV and press buttons.
+
+Without an IR blaster the app will refuse to send commands (no fake simulation).
+
+## Brands
+
+Haier, Haier Alt, Samsung, LG, Sony, Panasonic, TCL, Hisense, Sharp, Philips
+
+## Build
 
 ```bash
-./gradlew assembleRelease
-# output: app/build/outputs/apk/release/app-release.apk
+./gradlew test assembleRelease
 ```
-
-Release signing uses local `release.keystore` + `keystore.properties` (gitignored).
-
-## Limitations
-
-Physical IR TV control and USB-C IR adapters are **untested** in this environment. Without a built-in IR emitter the app runs in simulation mode.

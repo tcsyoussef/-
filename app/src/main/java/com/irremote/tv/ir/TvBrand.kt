@@ -1,6 +1,8 @@
 package com.irremote.tv.ir
 
 enum class TvBrand(val displayName: String, val protocol: IrProtocol) {
+    HAIER("Haier", IrProtocol.NEC),
+    HAIER_ALT("Haier Alt", IrProtocol.NEC),
     SAMSUNG("Samsung", IrProtocol.NEC),
     LG("LG", IrProtocol.NEC),
     SONY("Sony", IrProtocol.SIRC),
@@ -13,7 +15,7 @@ enum class TvBrand(val displayName: String, val protocol: IrProtocol) {
     companion object {
         fun fromDisplayName(name: String): TvBrand =
             entries.firstOrNull { it.displayName.equals(name, ignoreCase = true) }
-                ?: SAMSUNG
+                ?: HAIER
     }
 }
 

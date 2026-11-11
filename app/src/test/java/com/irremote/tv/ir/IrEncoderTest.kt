@@ -68,11 +68,27 @@ class IrEncoderTest {
     @Test
     fun brandLookup_isCaseInsensitive() {
         assertEquals(TvBrand.LG, TvBrand.fromDisplayName("lg"))
-        assertEquals(TvBrand.SAMSUNG, TvBrand.fromDisplayName("unknown"))
+        assertEquals(TvBrand.HAIER, TvBrand.fromDisplayName("haier"))
+        assertEquals(TvBrand.HAIER, TvBrand.fromDisplayName("unknown"))
     }
 
     @Test
     fun sonyPowerCode_is0x15() {
         assertEquals(0x15, IrEncoder.commandCode(TvBrand.SONY, RemoteCommand.POWER))
+    }
+
+    @Test
+    fun haierPower_usesNecAddress04Command08() {
+        assertEquals(0x04, IrEncoder.addressFor(TvBrand.HAIER))
+        assertEquals(0x08, IrEncoder.commandCode(TvBrand.HAIER, RemoteCommand.POWER))
+        val pattern = IrEncoder.encode(TvBrand.HAIER, RemoteCommand.POWER)
+        assertEquals(38_000, pattern.frequencyHz)
+        assertEquals(67, pattern.patternMicros.size)
+    }
+
+    @Test
+    fun haierAltPower_usesNecAddress00Command12() {
+        assertEquals(0x00, IrEncoder.addressFor(TvBrand.HAIER_ALT))
+        assertEquals(0x12, IrEncoder.commandCode(TvBrand.HAIER_ALT, RemoteCommand.POWER))
     }
 }

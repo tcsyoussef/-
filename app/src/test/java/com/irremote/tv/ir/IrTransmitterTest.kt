@@ -6,8 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FakeIrTransmitter(
-    override val hasBuiltInEmitter: Boolean = false,
-    override val supportsUsbIrAdapter: Boolean = false
+    override val hasBuiltInEmitter: Boolean
 ) : IrTransmitter {
     var lastBrand: TvBrand? = null
     var lastCommand: RemoteCommand? = null
@@ -15,29 +14,31 @@ class FakeIrTransmitter(
     override fun transmit(brand: TvBrand, command: RemoteCommand): TransmitResult {
         lastBrand = brand
         lastCommand = command
+        if (!hasBuiltInEmitter) {
+            return TransmitResult.Failed("This phone has no IR blaster.")
+        }
         val pattern = IrEncoder.encode(brand, command)
-        return TransmitResult.Sent(pattern, simulated = !hasBuiltInEmitter)
+        return TransmitResult.Sent(pattern, repeats = 2)
     }
 }
 
 class IrTransmitterTest {
 
     @Test
-    fun fakeTransmitter_simulatesWithoutEmitter() {
+    fun withoutEmitter_failsInsteadOfSimulating() {
         val tx = FakeIrTransmitter(hasBuiltInEmitter = false)
-        val result = tx.transmit(TvBrand.SAMSUNG, RemoteCommand.MUTE)
-        assertTrue(result is TransmitResult.Sent)
-        val sent = result as TransmitResult.Sent
-        assertTrue(sent.simulated)
-        assertEquals(RemoteCommand.MUTE, tx.lastCommand)
-        assertFalse(tx.supportsUsbIrAdapter)
+        val result = tx.transmit(TvBrand.HAIER, RemoteCommand.POWER)
+        assertTrue(result is TransmitResult.Failed)
+        assertFalse(tx.hasBuiltInEmitter)
     }
 
     @Test
-    fun fakeTransmitter_marksHardwarePathWhenEmitterPresent() {
+    fun withEmitter_sendsHaierPower() {
         val tx = FakeIrTransmitter(hasBuiltInEmitter = true)
-        val result = tx.transmit(TvBrand.SONY, RemoteCommand.POWER) as TransmitResult.Sent
-        assertFalse(result.simulated)
-        assertEquals(40_000, result.pattern.frequencyHz)
+        val result = tx.transmit(TvBrand.HAIER, RemoteCommand.POWER) as TransmitResult.Sent
+        assertEquals(2, result.repeats)
+        assertEquals(38_000, result.pattern.frequencyHz)
+        assertEquals(RemoteCommand.POWER, tx.lastCommand)
+        assertEquals(TvBrand.HAIER, tx.lastBrand)
     }
 }

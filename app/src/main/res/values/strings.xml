@@ -2,10 +2,14 @@
 <resources>
     <string name="app_name">IR TV Remote</string>
     <string name="brand_label">TV brand</string>
-    <string name="status_ir_available">Built-in IR emitter detected</string>
-    <string name="status_ir_unavailable">No built-in IR emitter — simulation mode</string>
-    <string name="status_usb_ir_untested">USB-C IR adapters are not verified on this build</string>
-    <string name="disclaimer">Physical TV control requires a working IR emitter aimed at the TV. Transmission has not been validated against real hardware in this environment.</string>
+    <string name="status_ir_available">IR blaster ready — point phone at your TV</string>
+    <string name="status_ir_unavailable">No IR blaster on this phone</string>
+    <string name="status_aim_tv">Aim the top/back IR LED at the TV when pressing buttons</string>
+    <string name="status_need_ir_phone">Need a phone with built-in IR (infrared) to control a TV</string>
+    <string name="status_usb_ir_untested">USB-C IR adapters are not supported</string>
+    <string name="disclaimer">Select Haier (or Haier Alt if Power does not work). This app sends real IR signals through your phone\'s IR blaster — it cannot control a TV without IR hardware.</string>
+    <string name="no_ir_title">No IR blaster found</string>
+    <string name="no_ir_message">Your phone does not have a built-in infrared emitter, so it cannot send IR signals to a TV.\n\nUse a phone that includes an IR blaster (common on many Xiaomi, Huawei, Redmi, Honor, and some Samsung models), then reinstall this APK.\n\nSimulation mode has been removed — buttons only work with real IR hardware.</string>
     <string name="power">Power</string>
     <string name="mute">Mute</string>
     <string name="vol_up">Vol+</string>
@@ -24,6 +28,8 @@
     <string name="last_command">Last command: %1$s</string>
     <string name="no_command_yet">No command sent yet</string>
     <string-array name="tv_brands">
+        <item>Haier</item>
+        <item>Haier Alt</item>
         <item>Samsung</item>
         <item>LG</item>
         <item>Sony</item>
