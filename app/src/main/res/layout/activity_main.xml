@@ -156,6 +156,7 @@
                 android:id="@+id/modeMouse"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
+                android:layout_height="48dp"
                 android:layout_weight="1"
                 android:text="@string/mode_mouse"
                 android:textAllCaps="false" />
@@ -164,6 +165,7 @@
                 android:id="@+id/modeKeyboard"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
+                android:layout_height="48dp"
                 android:layout_weight="1"
                 android:text="@string/mode_keyboard"
                 android:textAllCaps="false" />
@@ -172,6 +174,7 @@
                 android:id="@+id/modeClassic"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
+                android:layout_height="48dp"
                 android:layout_weight="1"
                 android:text="@string/mode_classic"
                 android:textAllCaps="false" />

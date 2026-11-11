@@ -81,7 +81,7 @@ class TvKeyboardNavigator(
             "1234567890",
             "qwertyuiop",
             "asdfghjkl↵",
-            "zxcvbnm  ."
+            "zxcvbnm ."
         )
 
         private val KEY_SET: Set<Char> =
