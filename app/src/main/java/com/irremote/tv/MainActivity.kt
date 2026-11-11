@@ -2,6 +2,8 @@ package com.irremote.tv
 
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -14,37 +16,49 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
+import com.irremote.tv.control.ControlLink
+import com.irremote.tv.control.TvCommandRouter
 import com.irremote.tv.databinding.ActivityMainBinding
 import com.irremote.tv.input.IrCommandRunner
 import com.irremote.tv.input.PointerController
 import com.irremote.tv.input.TouchpadView
 import com.irremote.tv.input.TvKeyboardNavigator
 import com.irremote.tv.ir.AndroidIrTransmitter
-import com.irremote.tv.ir.IrTransmitter
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
 import com.irremote.tv.ir.TvBrand
+import com.irremote.tv.wifi.HaierWifiClient
+import com.irremote.tv.wifi.WifiTvDevice
+import com.irremote.tv.wifi.WifiTvScanner
+import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var transmitter: IrTransmitter
+    private lateinit var router: TvCommandRouter
+    private lateinit var wifiClient: HaierWifiClient
     private lateinit var runner: IrCommandRunner
     private var selectedBrand: TvBrand = TvBrand.HAIER
     private var warnedMissingIr = false
 
     private val keyboardNavigator = TvKeyboardNavigator()
     private val hardwarePointer = PointerController(stepPixels = 36f, minIntervalMs = 70L)
+    private val ioExecutor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        transmitter = AndroidIrTransmitter(this)
-        runner = IrCommandRunner(transmitter)
+        val ir = AndroidIrTransmitter(this)
+        wifiClient = HaierWifiClient()
+        router = TvCommandRouter(ir, wifiClient)
+        runner = IrCommandRunner(sender = { brand, command -> router.send(brand, command) })
 
         setupStatus()
+        setupLinkToggle()
+        setupWifiPanel()
         setupBrandSpinner()
         setupModeToggle()
         bindCoreButtons()
@@ -52,23 +66,133 @@ class MainActivity : AppCompatActivity() {
         setupTouchpad()
         setupKeyboard()
         showMode(Mode.MOUSE)
+        applyLink(ControlLink.IR)
 
-        if (!transmitter.hasBuiltInEmitter) {
-            showMissingIrDialog()
+        if (!ir.hasBuiltInEmitter) {
+            // Prefer Wi‑Fi when phone has no IR
+            binding.linkToggle.check(R.id.linkWifi)
         }
     }
 
     private fun setupStatus() {
-        if (transmitter.hasBuiltInEmitter) {
-            binding.statusText.text = getString(R.string.status_ir_available)
-            binding.statusText.setTextColor(getColor(R.color.accent_teal))
-            binding.usbStatusText.text = getString(R.string.status_aim_tv)
-            binding.usbStatusText.setTextColor(getColor(R.color.text_muted))
-        } else {
-            binding.statusText.text = getString(R.string.status_ir_unavailable)
-            binding.statusText.setTextColor(getColor(R.color.accent_red))
-            binding.usbStatusText.text = getString(R.string.status_need_ir_phone)
-            binding.usbStatusText.setTextColor(getColor(R.color.accent_amber))
+        refreshStatusBanner()
+    }
+
+    private fun refreshStatusBanner() {
+        when (router.link) {
+            ControlLink.IR -> {
+                if (router.statusReady()) {
+                    binding.statusText.text = getString(R.string.status_ir_available)
+                    binding.statusText.setTextColor(getColor(R.color.accent_teal))
+                    binding.usbStatusText.text = getString(R.string.status_aim_tv)
+                } else {
+                    binding.statusText.text = getString(R.string.status_ir_unavailable)
+                    binding.statusText.setTextColor(getColor(R.color.accent_red))
+                    binding.usbStatusText.text = getString(R.string.status_need_ir_phone)
+                }
+                binding.usbStatusText.setTextColor(getColor(R.color.text_muted))
+            }
+            ControlLink.WIFI -> {
+                binding.statusText.text = getString(R.string.status_wifi_mode)
+                binding.statusText.setTextColor(getColor(R.color.accent_teal))
+                val device = wifiClient.device
+                if (device != null) {
+                    binding.usbStatusText.text = getString(R.string.wifi_connected_fmt, device.displayLabel)
+                    binding.usbStatusText.setTextColor(getColor(R.color.accent_teal))
+                    binding.wifiInclude.wifiStatusText.text =
+                        getString(R.string.wifi_connected_fmt, device.displayLabel)
+                    binding.wifiInclude.wifiStatusText.setTextColor(getColor(R.color.accent_teal))
+                } else {
+                    binding.usbStatusText.text = getString(R.string.wifi_not_connected)
+                    binding.usbStatusText.setTextColor(getColor(R.color.accent_amber))
+                    binding.wifiInclude.wifiStatusText.text = getString(R.string.wifi_not_connected)
+                    binding.wifiInclude.wifiStatusText.setTextColor(getColor(R.color.accent_amber))
+                }
+            }
+        }
+    }
+
+    private fun setupLinkToggle() {
+        binding.linkToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            when (checkedId) {
+                R.id.linkIr -> applyLink(ControlLink.IR)
+                R.id.linkWifi -> applyLink(ControlLink.WIFI)
+            }
+        }
+    }
+
+    private fun applyLink(link: ControlLink) {
+        router.link = link
+        binding.wifiInclude.root.visibility = if (link == ControlLink.WIFI) View.VISIBLE else View.GONE
+        // Brand IR codes matter for IR; Wi‑Fi uses Haier SmartCenter codes
+        val showBrand = link == ControlLink.IR
+        binding.brandLabel.visibility = if (showBrand) View.VISIBLE else View.GONE
+        binding.brandSpinner.visibility = if (showBrand) View.VISIBLE else View.GONE
+        refreshStatusBanner()
+        if (link == ControlLink.IR && !router.statusReady() && !warnedMissingIr) {
+            showMissingIrDialog()
+        }
+    }
+
+    private fun setupWifiPanel() {
+        val wifi = binding.wifiInclude
+        wifi.btnWifiConnect.setOnClickListener {
+            val ip = wifi.wifiIpInput.text?.toString().orEmpty()
+            connectWifi(ip)
+        }
+        wifi.btnWifiScan.setOnClickListener { scanWifi() }
+    }
+
+    private fun scanWifi() {
+        val wifi = binding.wifiInclude
+        wifi.wifiScanResultText.text = getString(R.string.wifi_scanning)
+        wifi.wifiDeviceList.removeAllViews()
+        wifi.btnWifiScan.isEnabled = false
+        ioExecutor.execute {
+            val devices = try {
+                WifiTvScanner(this, wifiClient).scan()
+            } catch (_: Exception) {
+                emptyList()
+            }
+            mainHandler.post {
+                wifi.btnWifiScan.isEnabled = true
+                wifi.wifiDeviceList.removeAllViews()
+                if (devices.isEmpty()) {
+                    wifi.wifiScanResultText.text = getString(R.string.wifi_scan_none)
+                } else {
+                    wifi.wifiScanResultText.text = getString(R.string.wifi_scan_found, devices.size)
+                    devices.forEach { device -> addWifiDeviceRow(device) }
+                }
+            }
+        }
+    }
+
+    private fun addWifiDeviceRow(device: WifiTvDevice) {
+        val button = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+            text = device.displayLabel
+            isAllCaps = false
+            setOnClickListener {
+                binding.wifiInclude.wifiIpInput.setText(device.ip)
+                connectWifi(device.ip)
+            }
+        }
+        binding.wifiInclude.wifiDeviceList.addView(button)
+    }
+
+    private fun connectWifi(ip: String) {
+        binding.wifiInclude.wifiStatusText.text = getString(R.string.wifi_connecting)
+        ioExecutor.execute {
+            val result = wifiClient.connect(ip)
+            mainHandler.post {
+                result.onSuccess {
+                    Toast.makeText(this, getString(R.string.wifi_connected_fmt, it.displayLabel), Toast.LENGTH_SHORT).show()
+                    refreshStatusBanner()
+                }.onFailure {
+                    Toast.makeText(this, it.message ?: "Connect failed", Toast.LENGTH_LONG).show()
+                    refreshStatusBanner()
+                }
+            }
         }
     }
 
@@ -175,13 +299,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun buildKeyboardGrid(grid: GridLayout) {
         grid.removeAllViews()
-        val rows = TvKeyboardNavigator.DEFAULT_LAYOUT
-        rows.forEach { row ->
+        TvKeyboardNavigator.DEFAULT_LAYOUT.forEach { row ->
             row.forEach { ch ->
                 val label = when (ch) {
                     ' ' -> "SPC"
                     '↵' -> "ENT"
-                    else -> ch.toString()
+                    else -> ch.uppercaseChar().toString()
                 }
                 val button = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
                     text = label
@@ -202,7 +325,6 @@ class MainActivity : AppCompatActivity() {
                 grid.addView(button)
             }
         }
-        // Extra functional keys
         addExtraKey(grid, "⌫") { onSoftKey('\b') }
         addExtraKey(grid, "OK") { sendSingle(RemoteCommand.OK) }
         addExtraKey(grid, "Back") { sendSingle(RemoteCommand.BACK) }
@@ -224,18 +346,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onSoftKey(ch: Char) {
-        if (!ensureIr()) return
+        if (!ensureTransport()) return
         if (runner.isBusy()) {
             Toast.makeText(this, R.string.typing_busy, Toast.LENGTH_SHORT).show()
             return
         }
-        // Always navigate the TV on-screen keyboard with real IR arrows + OK.
         val commands = keyboardNavigator.typeCharacter(ch)
         if (commands.isEmpty()) return
-        sendSequence(commands) {
-            updateKeyboardCursorLabel()
-        }
-        binding.lastCommandText.text = "Keyboard → '$ch' (${commands.size} IR steps)"
+        sendSequence(commands) { updateKeyboardCursorLabel() }
+        binding.lastCommandText.text = "Keyboard → '$ch' (${commands.size} steps)"
         binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
     }
 
@@ -249,11 +368,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendSingle(command: RemoteCommand) {
-        if (!ensureIr()) return
-        when (val result = transmitter.transmit(selectedBrand, command)) {
+        if (!ensureTransport()) return
+        ioExecutor.execute {
+            val result = router.send(selectedBrand, command)
+            mainHandler.post { showResult(command, result) }
+        }
+    }
+
+    private fun showResult(command: RemoteCommand, result: TransmitResult) {
+        when (result) {
             is TransmitResult.Sent -> {
+                val via = if (router.link == ControlLink.WIFI) "Wi‑Fi" else "IR"
                 binding.lastCommandText.text =
-                    getString(R.string.last_command, "${selectedBrand.displayName} ${command.label} (IR sent)")
+                    getString(R.string.last_command, "${command.label} ($via)")
                 binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
             }
             is TransmitResult.Failed -> {
@@ -265,44 +392,70 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendSequence(commands: List<RemoteCommand>, announce: Boolean = true, onDone: (() -> Unit)? = null) {
-        if (!ensureIr()) return
+        if (!ensureTransport()) return
         if (commands.isEmpty()) {
             onDone?.invoke()
             return
         }
         if (announce) {
             binding.lastCommandText.text =
-                "Sending ${commands.size} IR step(s): ${commands.joinToString(" → ") { it.label }}"
+                "Sending ${commands.size} step(s): ${commands.joinToString(" → ") { it.label }}"
             binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
         }
-        runner.enqueue(selectedBrand, commands, onEach = { cmd, result ->
-            if (result is TransmitResult.Failed) {
-                Toast.makeText(this, result.reason, Toast.LENGTH_LONG).show()
-            } else if (!announce) {
-                binding.lastCommandText.text = "IR → ${cmd.label}"
-                binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
+        // Run network/IR off main for Wi‑Fi; runner already spaces calls
+        ioExecutor.execute {
+            val gap = 120L
+            for ((index, command) in commands.withIndex()) {
+                val result = router.send(selectedBrand, command)
+                mainHandler.post {
+                    if (result is TransmitResult.Failed) {
+                        Toast.makeText(this, result.reason, Toast.LENGTH_LONG).show()
+                    } else if (!announce) {
+                        binding.lastCommandText.text = "→ ${command.label}"
+                        binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
+                    }
+                }
+                if (result is TransmitResult.Failed) {
+                    mainHandler.post { onDone?.invoke() }
+                    return@execute
+                }
+                if (index < commands.lastIndex) Thread.sleep(gap)
             }
-        }, onDone = onDone)
+            mainHandler.post { onDone?.invoke() }
+        }
     }
 
-    private fun ensureIr(): Boolean {
-        if (transmitter.hasBuiltInEmitter) return true
-        if (!warnedMissingIr) showMissingIrDialog() else {
-            Toast.makeText(this, R.string.status_need_ir_phone, Toast.LENGTH_LONG).show()
+    private fun ensureTransport(): Boolean {
+        if (router.statusReady()) return true
+        return when (router.link) {
+            ControlLink.IR -> {
+                if (!warnedMissingIr) showMissingIrDialog() else {
+                    Toast.makeText(this, R.string.status_need_ir_phone, Toast.LENGTH_LONG).show()
+                }
+                false
+            }
+            ControlLink.WIFI -> {
+                Toast.makeText(this, R.string.need_wifi_connect, Toast.LENGTH_LONG).show()
+                false
+            }
         }
-        return false
     }
 
     private fun showMissingIrDialog() {
         warnedMissingIr = true
         AlertDialog.Builder(this)
             .setTitle(R.string.no_ir_title)
-            .setMessage(R.string.no_ir_message)
+            .setMessage(
+                getString(R.string.no_ir_message) +
+                    "\n\nOr switch to Wi‑Fi mode if your Haier TV is on the same network."
+            )
             .setPositiveButton(android.R.string.ok, null)
+            .setNeutralButton(R.string.link_wifi) { _, _ ->
+                binding.linkToggle.check(R.id.linkWifi)
+            }
             .show()
     }
 
-    /** Physical keyboard → real IR commands. */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount > 0) {
             return super.dispatchKeyEvent(event)
@@ -345,29 +498,14 @@ class MainActivity : AppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 
-    /** Hardware / Bluetooth mouse → real IR D-pad steps. */
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
         if (event.source and InputDevice.SOURCE_CLASS_POINTER == 0) {
             return super.onGenericMotionEvent(event)
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_MOVE -> {
-                val dx = event.getAxisValue(MotionEvent.AXIS_RELATIVE_X)
-                    .takeIf { it != 0f } ?: (event.x - (event.historySize.takeIf { it > 0 }?.let {
-                        event.getHistoricalX(0)
-                    } ?: event.x))
-                val dy = event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y)
-                    .takeIf { it != 0f } ?: 0f
-                // Prefer relative axes from mouse; fall back to scroll axes
-                val relX = if (event.device != null &&
-                    (event.source and InputDevice.SOURCE_MOUSE) == InputDevice.SOURCE_MOUSE
-                ) {
-                    event.getAxisValue(MotionEvent.AXIS_RELATIVE_X)
-                } else dx
-                val relY = if ((event.source and InputDevice.SOURCE_MOUSE) == InputDevice.SOURCE_MOUSE) {
-                    event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y)
-                } else dy
-
+                val relX = event.getAxisValue(MotionEvent.AXIS_RELATIVE_X)
+                val relY = event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y)
                 val useX = if (relX != 0f) relX else event.getAxisValue(MotionEvent.AXIS_HSCROLL) * 40f
                 val useY = if (relY != 0f) relY else event.getAxisValue(MotionEvent.AXIS_VSCROLL) * 40f
                 val commands = hardwarePointer.onMove(useX, useY)
@@ -377,8 +515,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             MotionEvent.ACTION_SCROLL -> {
-                val v = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
-                hardwarePointer.onScroll(v)?.let {
+                hardwarePointer.onScroll(event.getAxisValue(MotionEvent.AXIS_VSCROLL))?.let {
                     sendSingle(it)
                     return true
                 }
@@ -391,6 +528,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return super.onGenericMotionEvent(event)
+    }
+
+    override fun onDestroy() {
+        ioExecutor.shutdownNow()
+        super.onDestroy()
     }
 
     private enum class Mode { MOUSE, KEYBOARD, CLASSIC }

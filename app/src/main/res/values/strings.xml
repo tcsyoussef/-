@@ -34,7 +34,21 @@
     <string name="keyboard_help">Open the on-screen keyboard on your TV first, then tap Reset cursor. Each key sends real IR arrow moves + OK to type on the TV.</string>
     <string name="reset_tv_keyboard_cursor">Reset TV keyboard cursor</string>
     <string name="keyboard_cursor_fmt">Assumed TV focus: row %1$d col %2$d (%3$s)</string>
-    <string name="typing_busy">Still sending IR sequence…</string>
+    <string name="typing_busy">Still sending command sequence…</string>
+    <string name="link_ir">IR</string>
+    <string name="link_wifi">Wi‑Fi</string>
+    <string name="wifi_help">Same Wi‑Fi as your Haier TV. Scan or enter the TV IP, then Connect. Commands use the Haier SmartCenter LAN API (ports 56789/56790).</string>
+    <string name="wifi_not_connected">Wi‑Fi: not connected</string>
+    <string name="wifi_connected_fmt">Wi‑Fi connected: %1$s</string>
+    <string name="wifi_ip_hint">TV IP address (e.g. 192.168.1.50)</string>
+    <string name="wifi_scan">Scan</string>
+    <string name="wifi_connect">Connect</string>
+    <string name="wifi_scanning">Scanning Wi‑Fi for Haier TVs…</string>
+    <string name="wifi_scan_none">No Haier TV found on this network. Enter the IP from TV Network settings.</string>
+    <string name="wifi_scan_found">Found %1$d device(s). Tap one to connect.</string>
+    <string name="wifi_connecting">Connecting…</string>
+    <string name="need_wifi_connect">Connect to your TV over Wi‑Fi first</string>
+    <string name="status_wifi_mode">Wi‑Fi mode — no IR blaster required</string>
     <string-array name="tv_brands">
         <item>Haier</item>
         <item>Haier Alt</item>

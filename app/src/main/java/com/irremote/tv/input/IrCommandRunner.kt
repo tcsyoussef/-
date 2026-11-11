@@ -2,16 +2,15 @@ package com.irremote.tv.input
 
 import android.os.Handler
 import android.os.Looper
-import com.irremote.tv.ir.IrTransmitter
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
 import com.irremote.tv.ir.TvBrand
 
 /**
- * Sends a sequence of IR commands with spacing so the TV can process each step.
+ * Sends a sequence of commands with spacing so the TV can process each step.
  */
 class IrCommandRunner(
-    private val transmitter: IrTransmitter,
+    private val sender: (TvBrand, RemoteCommand) -> TransmitResult,
     private val gapMs: Long = 120L,
     private val handler: Handler = Handler(Looper.getMainLooper())
 ) {
@@ -46,7 +45,7 @@ class IrCommandRunner(
             return
         }
         val command = commands[index]
-        val result = transmitter.transmit(brand, command)
+        val result = sender(brand, command)
         onEach?.invoke(command, result)
         if (result is TransmitResult.Failed) {
             queued = false
