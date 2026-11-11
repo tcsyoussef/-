@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">IR TV Remote</string>
+    <string name="brand_label">TV brand</string>
+    <string name="status_ir_available">Built-in IR emitter detected</string>
+    <string name="status_ir_unavailable">No built-in IR emitter — simulation mode</string>
+    <string name="status_usb_ir_untested">USB-C IR adapters are not verified on this build</string>
+    <string name="disclaimer">Physical TV control requires a working IR emitter aimed at the TV. Transmission has not been validated against real hardware in this environment.</string>
+    <string name="power">Power</string>
+    <string name="mute">Mute</string>
+    <string name="vol_up">Vol+</string>
+    <string name="vol_down">Vol−</string>
+    <string name="ch_up">CH+</string>
+    <string name="ch_down">CH−</string>
+    <string name="ok">OK</string>
+    <string name="up">▲</string>
+    <string name="down">▼</string>
+    <string name="left">◀</string>
+    <string name="right">▶</string>
+    <string name="home">Home</string>
+    <string name="back">Back</string>
+    <string name="input">Input</string>
+    <string name="menu">Menu</string>
+    <string name="last_command">Last command: %1$s</string>
+    <string name="no_command_yet">No command sent yet</string>
+    <string-array name="tv_brands">
+        <item>Samsung</item>
+        <item>LG</item>
+        <item>Sony</item>
+        <item>Panasonic</item>
+        <item>TCL</item>
+        <item>Hisense</item>
+        <item>Sharp</item>
+        <item>Philips</item>
+    </string-array>
+</resources>

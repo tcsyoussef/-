@@ -1,0 +1,21 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build/
+/app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*.ap_
+*.aab
+*.dex
+*.class
+bin/
+gen/
+out/
+.kotlin/
+# Deliverable APKs live in dist/
+!dist/
+!dist/*.apk
