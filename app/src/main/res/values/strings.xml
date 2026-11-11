@@ -27,6 +27,14 @@
     <string name="menu">Menu</string>
     <string name="last_command">Last command: %1$s</string>
     <string name="no_command_yet">No command sent yet</string>
+    <string name="mode_mouse">Mouse</string>
+    <string name="mode_keyboard">Keyboard</string>
+    <string name="mode_classic">Arrows</string>
+    <string name="touchpad_help">Swipe on the pad to move the TV cursor with real IR. Tap for OK. Works with a Bluetooth mouse too.</string>
+    <string name="keyboard_help">Open the on-screen keyboard on your TV first, then tap Reset cursor. Each key sends real IR arrow moves + OK to type on the TV.</string>
+    <string name="reset_tv_keyboard_cursor">Reset TV keyboard cursor</string>
+    <string name="keyboard_cursor_fmt">Assumed TV focus: row %1$d col %2$d (%3$s)</string>
+    <string name="typing_busy">Still sending IR sequence…</string>
     <string-array name="tv_brands">
         <item>Haier</item>
         <item>Haier Alt</item>

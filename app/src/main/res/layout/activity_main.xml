@@ -77,7 +77,7 @@
             style="@style/RemoteButton.Power"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="16dp"
             android:text="@string/power" />
 
         <LinearLayout
@@ -143,188 +143,244 @@
                 android:text="@string/ch_up" />
         </LinearLayout>
 
-        <GridLayout
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/modeToggle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:alignmentMode="alignBounds"
-            android:columnCount="3"
-            android:rowCount="3"
-            android:useDefaultMargins="true">
-
-            <Space
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_columnWeight="1" />
+            app:checkedButton="@+id/modeMouse"
+            app:selectionRequired="true"
+            app:singleSelection="true">
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnUp"
-                style="@style/RemoteButton"
+                android:id="@+id/modeMouse"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="@string/up" />
-
-            <Space
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_columnWeight="1" />
+                android:layout_weight="1"
+                android:text="@string/mode_mouse"
+                android:textAllCaps="false" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnLeft"
-                style="@style/RemoteButton"
+                android:id="@+id/modeKeyboard"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="@string/left" />
+                android:layout_weight="1"
+                android:text="@string/mode_keyboard"
+                android:textAllCaps="false" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnOk"
-                style="@style/RemoteButton.Accent"
+                android:id="@+id/modeClassic"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="@string/ok" />
+                android:layout_weight="1"
+                android:text="@string/mode_classic"
+                android:textAllCaps="false" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnRight"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="@string/right" />
+        <include
+            android:id="@+id/touchpadInclude"
+            layout="@layout/panel_touchpad"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" />
 
-            <Space
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_columnWeight="1" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnDown"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="@string/down" />
-
-            <Space
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_columnWeight="1" />
-        </GridLayout>
+        <include
+            android:id="@+id/keyboardInclude"
+            layout="@layout/panel_keyboard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" />
 
         <LinearLayout
+            android:id="@+id/classicPanel"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:orientation="horizontal">
+            android:orientation="vertical"
+            android:visibility="gone">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnMenu"
-                style="@style/RemoteButton"
-                android:layout_marginEnd="4dp"
-                android:layout_weight="1"
-                android:text="@string/menu" />
+            <GridLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:alignmentMode="alignBounds"
+                android:columnCount="3"
+                android:rowCount="3"
+                android:useDefaultMargins="true">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnHome"
-                style="@style/RemoteButton"
-                android:layout_marginHorizontal="4dp"
-                android:layout_weight="1"
-                android:text="@string/home" />
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_columnWeight="1" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnBack"
-                style="@style/RemoteButton"
-                android:layout_marginStart="4dp"
-                android:layout_weight="1"
-                android:text="@string/back" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnUp"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="@string/up" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_columnWeight="1" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnLeft"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="@string/left" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOk"
+                    style="@style/RemoteButton.Accent"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="@string/ok" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnRight"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="@string/right" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_columnWeight="1" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDown"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="@string/down" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_columnWeight="1" />
+            </GridLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMenu"
+                    style="@style/RemoteButton"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/menu" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnHome"
+                    style="@style/RemoteButton"
+                    android:layout_marginHorizontal="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/home" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBack"
+                    style="@style/RemoteButton"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/back" />
+            </LinearLayout>
+
+            <GridLayout
+                android:id="@+id/numberPad"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:alignmentMode="alignBounds"
+                android:columnCount="3"
+                android:rowCount="4"
+                android:useDefaultMargins="true">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn1"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="1" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn2"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="2" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn3"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="3" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn4"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="4" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn5"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="5" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn6"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="6" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn7"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="7" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn8"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="8" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn9"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="9" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_columnWeight="1" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn0"
+                    style="@style/RemoteButton"
+                    android:layout_width="0dp"
+                    android:layout_columnWeight="1"
+                    android:text="0" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_columnWeight="1" />
+            </GridLayout>
         </LinearLayout>
-
-        <GridLayout
-            android:id="@+id/numberPad"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:alignmentMode="alignBounds"
-            android:columnCount="3"
-            android:rowCount="4"
-            android:useDefaultMargins="true">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn1"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="1" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn2"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="2" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn3"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="3" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn4"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="4" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn5"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="5" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn6"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="6" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn7"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="7" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn8"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="8" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn9"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="9" />
-
-            <Space
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_columnWeight="1" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn0"
-                style="@style/RemoteButton"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:text="0" />
-
-            <Space
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_columnWeight="1" />
-        </GridLayout>
     </LinearLayout>
 </ScrollView>
