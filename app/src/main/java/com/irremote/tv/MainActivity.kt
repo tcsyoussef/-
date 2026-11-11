@@ -44,9 +44,11 @@ class MainActivity : AppCompatActivity() {
         val brands = resources.getStringArray(R.array.tv_brands)
         binding.brandSpinner.adapter = ArrayAdapter(
             this,
-            android.R.layout.simple_spinner_dropdown_item,
+            R.layout.spinner_item,
             brands
-        )
+        ).also { adapter ->
+            adapter.setDropDownViewResource(R.layout.spinner_dropdown_item)
+        }
         binding.brandSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
                 parent: AdapterView<*>?,

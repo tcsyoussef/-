@@ -12,8 +12,10 @@ Android infrared TV remote control app with multi-brand command encoding.
 
 ### Outputs
 
-- Debug APK: `app/build/outputs/apk/debug/app-debug.apk`
-- Release APK: `app/build/outputs/apk/release/app-release-unsigned.apk`
+- Debug APK: `dist/app-debug.apk` (`app/build/outputs/apk/debug/app-debug.apk`)
+- Signed release APK: `dist/app-release.apk` (`app/build/outputs/apk/release/app-release.apk`)
+
+Create `release.keystore` + `keystore.properties` (gitignored) to enable release signing.
 
 ## Features
 
@@ -32,12 +34,17 @@ Android infrared TV remote control app with multi-brand command encoding.
 ## Signing a release APK
 
 ```bash
-keytool -genkeypair -v -keystore ir-tv-remote.jks -keyalg RSA -keysize 2048 -validity 10000 -alias irremote
+keytool -genkeypair -v -keystore release.keystore -keyalg RSA -keysize 2048 -validity 10000 -alias irremote
+cat > keystore.properties <<'EOF'
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=irremote
+keyPassword=YOUR_KEY_PASSWORD
+EOF
 ./gradlew assembleRelease
-# Or configure signingConfigs in app/build.gradle.kts and produce a signed APK
-jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore ir-tv-remote.jks app/build/outputs/apk/release/app-release-unsigned.apk irremote
-zipalign -v 4 app/build/outputs/apk/release/app-release-unsigned.apk app-release.apk
+# Output: app/build/outputs/apk/release/app-release.apk
 ```
+
+`app/build.gradle.kts` already wires `signingConfigs.release` when both files exist.
 
 ## Install
 
