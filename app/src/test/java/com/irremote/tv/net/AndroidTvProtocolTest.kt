@@ -55,9 +55,44 @@ class AndroidTvProtocolTest {
             androidTvPairing = tv.pairingPort,
             samsungWs = freePort(), samsungWss = freePort(),
             lgWs = freePort(), lgWss = freePort(),
-            roku = freePort(), haierDiscover = freePort()
+            roku = freePort(), haierDiscover = freePort(), haierCommand = listOf(freePort())
         )
     )
+
+    @Test
+    fun haierWithBothServicesSendsInputThroughSmartCenter() {
+        val smartCenter = com.irremote.tv.wifi.MockSmartCenterServer().also { it.start() }
+        try {
+            MockAndroidTv().use { tv ->
+                val wifi = WifiRemoteManager(
+                    store = InMemoryPairingStore(),
+                    identity = { identity },
+                    ports = TvPorts(
+                        androidTvRemote = tv.remotePort, androidTvPairing = tv.pairingPort,
+                        samsungWs = freePort(), samsungWss = freePort(), lgWs = freePort(), lgWss = freePort(),
+                        roku = freePort(), haierDiscover = smartCenter.discoverPort,
+                        haierCommand = listOf(smartCenter.commandPort), cast = freePort()
+                    )
+                )
+                val pin = wifi.connectIp("127.0.0.1", null) as ConnectOutcome.NeedsPin
+                assertTrue(pin.submit(tv.shownCode!!) is ConnectOutcome.Connected)
+                assertEquals(TvProtocol.ANDROID_TV, wifi.connectedTv?.protocol)
+
+                val router = com.irremote.tv.control.TvCommandRouter(
+                    com.irremote.tv.control.FakeIr(hasBuiltInEmitter = false), wifi
+                ).apply { link = com.irremote.tv.control.ControlLink.WIFI }
+                val brand = com.irremote.tv.ir.TvBrand.HAIER
+                assertTrue(router.send(brand, RemoteCommand.INPUT) is TransmitResult.Sent)
+                assertTrue(router.send(brand, RemoteCommand.HOME) is TransmitResult.Sent)
+                waitFor { tv.keyCodes.isNotEmpty() }
+                // Input went to SmartCenter only (no Info probe key), Home stayed on Android TV
+                assertEquals(listOf(true), smartCenter.receivedBodies.map { it.contains("1056") })
+                assertEquals(listOf(3), tv.keyCodes.toList())
+            }
+        } finally {
+            smartCenter.stop()
+        }
+    }
 
     @Test
     fun pairsWithCodeThenSendsKeysAndText() {

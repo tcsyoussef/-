@@ -217,7 +217,7 @@ class LanProtocolsTest {
         })
         val wifi = WifiRemoteManager(
             InMemoryPairingStore(), identity = { error("unused") },
-            ports = TvPorts(freePort(), freePort(), freePort(), freePort(), freePort(), freePort(), tv.port, freePort()),
+            ports = TvPorts(freePort(), freePort(), freePort(), freePort(), freePort(), freePort(), tv.port, freePort(), haierCommand = listOf(freePort())),
             http = http
         )
         val found = wifi.detect("127.0.0.1")
@@ -234,7 +234,7 @@ class LanProtocolsTest {
     fun manager_reportsNothingFound() {
         val wifi = WifiRemoteManager(
             InMemoryPairingStore(), identity = { error("unused") },
-            ports = TvPorts(freePort(), freePort(), freePort(), freePort(), freePort(), freePort(), freePort(), freePort()),
+            ports = TvPorts(freePort(), freePort(), freePort(), freePort(), freePort(), freePort(), freePort(), freePort(), haierCommand = listOf(freePort())),
             http = http
         )
         val result = wifi.connectIp("127.0.0.1", null)

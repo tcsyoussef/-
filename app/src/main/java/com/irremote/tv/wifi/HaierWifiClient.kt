@@ -35,7 +35,8 @@ class HaierWifiClient(
     val isConnected: Boolean
         get() = connected.get() != null
 
-    fun connect(ip: String, timeoutMs: Int = 3500): Result<WifiTvDevice> {
+    /** [probeKey] sends Info to confirm keys are accepted; off when the TV is already used via another channel. */
+    fun connect(ip: String, timeoutMs: Int = 3500, probeKey: Boolean = true): Result<WifiTvDevice> {
         val cleaned = ip.trim()
         if (!IPV4.matches(cleaned)) {
             return Result.failure(IllegalArgumentException("Enter a valid IPv4 address"))
@@ -69,8 +70,8 @@ class HaierWifiClient(
                 Log.w(TAG, "No command port answered yet on $cleaned — connecting with :$commandPort")
             }
             runCatching { wakeSmartCenter(cleaned, commandPort) }
-            val accepted = runCatching { postKey(cleaned, KEY_INFO, commandPort) }.getOrDefault(false)
-            if (!accepted) {
+            val accepted = probeKey && runCatching { postKey(cleaned, KEY_INFO, commandPort) }.getOrDefault(false)
+            if (probeKey && !accepted) {
                 Log.w(
                     TAG,
                     "Info probe not accepted on :$commandPort (HTTP ${lastHttpStatus.get()}) — still connecting"

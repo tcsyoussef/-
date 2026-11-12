@@ -35,5 +35,6 @@ data class TvPorts(
     val lgWss: Int = 3001,
     val roku: Int = 8060,
     val haierDiscover: Int = 56790,
+    val haierCommand: List<Int> = listOf(56789, 56791),
     val cast: Int = 8008
 )

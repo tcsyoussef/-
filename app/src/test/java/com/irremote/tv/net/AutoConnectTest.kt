@@ -65,7 +65,7 @@ class AutoConnectTest {
             ports = TvPorts(
                 androidTvRemote = brokenPort(), androidTvPairing = brokenPort(),
                 samsungWs = freePort(), samsungWss = freePort(), lgWs = freePort(), lgWss = freePort(),
-                roku = roku.port, haierDiscover = freePort(), cast = freePort()
+                roku = roku.port, haierDiscover = freePort(), haierCommand = listOf(freePort()), cast = freePort()
             ),
             http = http
         )
@@ -104,7 +104,7 @@ class AutoConnectTest {
             ports = TvPorts(
                 androidTvRemote = freePort(), androidTvPairing = freePort(),
                 samsungWs = samsung.port, samsungWss = freePort(), lgWs = freePort(), lgWss = freePort(),
-                roku = freePort(), haierDiscover = freePort(), cast = freePort()
+                roku = freePort(), haierDiscover = freePort(), haierCommand = listOf(freePort()), cast = freePort()
             ),
             http = http
         )
@@ -127,7 +127,7 @@ class AutoConnectTest {
             ports = TvPorts(
                 androidTvRemote = freePort(), androidTvPairing = freePort(),
                 samsungWs = freePort(), samsungWss = freePort(), lgWs = freePort(), lgWss = freePort(),
-                roku = roku.port, haierDiscover = freePort(), cast = freePort()
+                roku = roku.port, haierDiscover = freePort(), haierCommand = listOf(freePort()), cast = freePort()
             ),
             http = http
         )

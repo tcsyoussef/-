@@ -16,6 +16,7 @@ import com.irremote.tv.wifi.HaierWifiClient
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
 /**
@@ -41,6 +42,37 @@ class WifiRemoteManager(
     override val supportsText: Boolean get() = session?.supportsText == true
 
     override fun send(command: RemoteCommand): TransmitResult = withRecovery { it.send(command) }
+
+    override val inputKeyReliable: Boolean get() = session?.tv?.protocol != TvProtocol.ANDROID_TV
+
+    @Volatile private var inputHelper: HaierSession? = null
+    private val smartCenterAt = ConcurrentHashMap<String, Boolean>()
+
+    /**
+     * Haier TVs often answer both Android TV and SmartCenter. Google TV ignores Input sent over
+     * the Android TV remote, but SmartCenter's Input key opens the TV's source menu.
+     */
+    override fun sendNativeInput(): TransmitResult? {
+        val tv = session?.tv ?: return null
+        if (tv.protocol == TvProtocol.HAIER_VESTEL) return null
+        val helper = inputHelper?.takeIf { it.tv.ip == tv.ip && it.isOpen } ?: run {
+            val available = smartCenterAt.getOrPut(tv.ip) {
+                (listOf(ports.haierDiscover) + ports.haierCommand).any { isPortOpen(tv.ip, it, probeTimeoutMs) }
+            }
+            if (!available) return null
+            runCatching {
+                HaierSession(tv.copy(protocol = TvProtocol.HAIER_VESTEL), haierClient()).also { it.open(probeKey = false) }
+            }.onFailure { Log.w(TAG, "SmartCenter Input channel unavailable at ${tv.ip}", it) }
+                .getOrNull() ?: return null
+        }
+        inputHelper = helper
+        return helper.send(RemoteCommand.INPUT)
+    }
+
+    private fun haierClient() = HaierWifiClient(
+        discoverPort = ports.haierDiscover,
+        commandPorts = ports.haierCommand.toIntArray()
+    )
 
     override fun sendText(text: String): TransmitResult = withRecovery { it.sendText(text) }
 
@@ -71,6 +103,8 @@ class WifiRemoteManager(
     }
 
     fun disconnect() {
+        inputHelper?.close()
+        inputHelper = null
         session?.close()
         session = null
     }
@@ -96,7 +130,7 @@ class WifiRemoteManager(
         ports.samsungWss, ports.samsungWs,
         ports.lgWs, ports.lgWss,
         ports.roku, ports.haierDiscover
-    )
+    ) + ports.haierCommand
 
     /** Every platform answering at an IP, best first. */
     fun candidates(open: Set<Int>): List<TvProtocol> = buildList {
@@ -104,7 +138,7 @@ class WifiRemoteManager(
         if (ports.samsungWs in open || ports.samsungWss in open) add(TvProtocol.SAMSUNG)
         if (ports.lgWs in open || ports.lgWss in open) add(TvProtocol.LG_WEBOS)
         if (ports.roku in open) add(TvProtocol.ROKU)
-        if (ports.haierDiscover in open) add(TvProtocol.HAIER_VESTEL)
+        if (ports.haierDiscover in open || ports.haierCommand.any { it in open }) add(TvProtocol.HAIER_VESTEL)
     }
 
     fun classify(ip: String, open: Set<Int>): DiscoveredTv? {
@@ -195,7 +229,7 @@ class WifiRemoteManager(
                     connected(RokuSession(tv, http, ports.roku))
                 }
                 TvProtocol.HAIER_VESTEL -> connected(
-                    HaierSession(tv, HaierWifiClient(discoverPort = ports.haierDiscover)).also { it.open() }
+                    HaierSession(tv, haierClient()).also { it.open() }
                 )
             }
         } catch (error: Exception) {

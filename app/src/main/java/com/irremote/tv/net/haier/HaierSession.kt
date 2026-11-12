@@ -14,8 +14,8 @@ class HaierSession(
 
     override val isOpen: Boolean get() = client.isConnected
 
-    fun open() {
-        client.connect(tv.ip).getOrThrow()
+    fun open(probeKey: Boolean = true) {
+        client.connect(tv.ip, probeKey = probeKey).getOrThrow()
     }
 
     override fun send(command: RemoteCommand): TransmitResult = client.send(command)

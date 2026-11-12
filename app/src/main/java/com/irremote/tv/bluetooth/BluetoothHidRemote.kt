@@ -193,6 +193,8 @@ class BluetoothHidRemote(private val context: Context) : RemoteTarget {
         return TransmitResult.NETWORK_SENT
     }
 
+    override val inputKeyReliable: Boolean get() = false
+
     fun moveMouse(dx: Int, dy: Int): Boolean = report(HidReports.ID_MOUSE, HidReports.mouse(0, dx, dy))
 
     fun click(): Boolean =

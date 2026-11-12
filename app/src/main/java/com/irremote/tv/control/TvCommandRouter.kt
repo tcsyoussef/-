@@ -26,7 +26,21 @@ class TvCommandRouter(
         if (link == ControlLink.IR) return ir.transmit(brand, command)
         val target = target()
             ?: return TransmitResult.Failed("Bluetooth remote needs Android 9 or newer")
+        if (command == RemoteCommand.INPUT) return sendInput(brand, target)
         return target.send(command)
+    }
+
+    /**
+     * Input, best method first: the TV's own SmartCenter Input key, then the phone's IR blaster
+     * when the network key is unreliable (Google TV ignores it), then the network key.
+     */
+    private fun sendInput(brand: TvBrand, target: RemoteTarget): TransmitResult {
+        target.sendNativeInput()?.takeIf { it is TransmitResult.Sent }?.let { return it }
+        if (!target.inputKeyReliable && ir.hasBuiltInEmitter) {
+            val viaIr = ir.transmit(brand, RemoteCommand.INPUT)
+            if (viaIr is TransmitResult.Sent) return viaIr
+        }
+        return target.send(RemoteCommand.INPUT)
     }
 
     fun inputSources(): List<InputSource> = when (link) {

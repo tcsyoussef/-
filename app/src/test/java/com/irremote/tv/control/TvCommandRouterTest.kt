@@ -90,4 +90,52 @@ class TvCommandRouterTest {
         router.link = ControlLink.BLUETOOTH
         assertTrue(router.send(TvBrand.HAIER, RemoteCommand.BACK) is TransmitResult.Failed)
     }
+
+    private class InputTarget(
+        override val inputKeyReliable: Boolean,
+        private val native: TransmitResult? = null
+    ) : RemoteTarget {
+        override val isReady = true
+        override val supportsText = false
+        val sent = ArrayList<RemoteCommand>()
+        override fun send(command: RemoteCommand): TransmitResult {
+            sent += command
+            return TransmitResult.NETWORK_SENT
+        }
+        override fun sendNativeInput(): TransmitResult? = native
+    }
+
+    @Test
+    fun input_prefersTheTvsNativeInputChannel() {
+        val ir = FakeIr()
+        val wifi = InputTarget(inputKeyReliable = false, native = TransmitResult.NETWORK_SENT)
+        val router = TvCommandRouter(ir, wifi).apply { link = ControlLink.WIFI }
+        assertTrue(router.send(TvBrand.HAIER, RemoteCommand.INPUT) is TransmitResult.Sent)
+        assertEquals(null, ir.last)
+        assertTrue(wifi.sent.isEmpty())
+    }
+
+    @Test
+    fun input_usesIrWhenTheNetworkKeyIsUnreliable() {
+        val ir = FakeIr()
+        val wifi = InputTarget(inputKeyReliable = false)
+        val router = TvCommandRouter(ir, wifi).apply { link = ControlLink.WIFI }
+        assertTrue(router.send(TvBrand.HAIER, RemoteCommand.INPUT) is TransmitResult.Sent)
+        assertEquals(RemoteCommand.INPUT, ir.last)
+        assertTrue(wifi.sent.isEmpty())
+    }
+
+    @Test
+    fun input_staysOnTheNetworkWhenItIsReliableOrThereIsNoIr() {
+        val samsung = InputTarget(inputKeyReliable = true)
+        val ir = FakeIr()
+        TvCommandRouter(ir, samsung).apply { link = ControlLink.WIFI }.send(TvBrand.HAIER, RemoteCommand.INPUT)
+        assertEquals(listOf(RemoteCommand.INPUT), samsung.sent)
+        assertEquals(null, ir.last)
+
+        val googleTv = InputTarget(inputKeyReliable = false)
+        TvCommandRouter(FakeIr(hasBuiltInEmitter = false), googleTv).apply { link = ControlLink.WIFI }
+            .send(TvBrand.HAIER, RemoteCommand.INPUT)
+        assertEquals(listOf(RemoteCommand.INPUT), googleTv.sent)
+    }
 }

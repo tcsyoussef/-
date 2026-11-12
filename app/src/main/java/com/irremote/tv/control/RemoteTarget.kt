@@ -16,6 +16,15 @@ interface RemoteTarget {
     fun sendText(text: String): TransmitResult =
         TransmitResult.Failed("Typing is not supported on this connection")
 
+    /**
+     * Opens the TV's source menu through a side channel that handles Input better than [send],
+     * or null when there is none.
+     */
+    fun sendNativeInput(): TransmitResult? = null
+
+    /** False when this link's Input key is known to be ignored by many TVs (Google TV, Bluetooth). */
+    val inputKeyReliable: Boolean get() = true
+
     /** Sources offered in the Input picker; an empty list means Input switching isn't possible. */
     fun inputSources(): List<InputSource> = listOf(InputSource.INPUT_MENU)
 
