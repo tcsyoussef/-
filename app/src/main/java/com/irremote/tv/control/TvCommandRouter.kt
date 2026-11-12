@@ -43,6 +43,14 @@ class TvCommandRouter(
         return target.send(RemoteCommand.INPUT)
     }
 
+    fun launchApp(app: TvApp): TransmitResult {
+        if (link == ControlLink.IR) {
+            return TransmitResult.Failed("Infrared can't open ${app.label}. Connect over Wi‑Fi to use app buttons.")
+        }
+        val target = target() ?: return TransmitResult.Failed("Not connected")
+        return target.launchApp(app)
+    }
+
     fun inputSources(): List<InputSource> = when (link) {
         ControlLink.IR -> listOf(InputSource.INPUT_MENU)
         else -> target()?.inputSources().orEmpty()

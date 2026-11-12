@@ -2,6 +2,7 @@ package com.irremote.tv.net.lg
 
 import android.util.Log
 import com.irremote.tv.control.InputSource
+import com.irremote.tv.control.TvApp
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
 import com.irremote.tv.net.DiscoveredTv
@@ -191,6 +192,11 @@ class WebOsSession(
         "\b" -> ssap("ssap://com.webos.service.ime/deleteCharacters", JSONObject().put("count", 1))
         "\n" -> ssap("ssap://com.webos.service.ime/sendEnterKey")
         else -> ssap("ssap://com.webos.service.ime/insertText", JSONObject().put("text", text).put("replace", 0))
+    }
+
+    override fun launchApp(app: TvApp): TransmitResult {
+        val id = app.lgId ?: return super.launchApp(app)
+        return ssap("ssap://system.launcher/launch", JSONObject().put("id", id))
     }
 
     override fun inputSources(): List<InputSource> = InputSource.entries

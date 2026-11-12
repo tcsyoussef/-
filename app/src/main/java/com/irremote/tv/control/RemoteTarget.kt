@@ -25,6 +25,9 @@ interface RemoteTarget {
     /** False when this link's Input key is known to be ignored by many TVs (Google TV, Bluetooth). */
     val inputKeyReliable: Boolean get() = true
 
+    fun launchApp(app: TvApp): TransmitResult =
+        TransmitResult.Failed("${app.label} can't be opened over this connection")
+
     /** Sources offered in the Input picker; an empty list means Input switching isn't possible. */
     fun inputSources(): List<InputSource> = listOf(InputSource.INPUT_MENU)
 

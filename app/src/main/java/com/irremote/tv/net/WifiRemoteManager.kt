@@ -2,6 +2,7 @@ package com.irremote.tv.net
 
 import android.util.Log
 import com.irremote.tv.control.InputSource
+import com.irremote.tv.control.TvApp
 import com.irremote.tv.control.RemoteTarget
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
@@ -42,6 +43,8 @@ class WifiRemoteManager(
     override val supportsText: Boolean get() = session?.supportsText == true
 
     override fun send(command: RemoteCommand): TransmitResult = withRecovery { it.send(command) }
+
+    override fun launchApp(app: TvApp): TransmitResult = withRecovery { it.launchApp(app) }
 
     override val inputKeyReliable: Boolean get() = session?.tv?.protocol != TvProtocol.ANDROID_TV
 

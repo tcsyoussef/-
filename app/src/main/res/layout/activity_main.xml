@@ -5,7 +5,7 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg"
+    android:background="@drawable/bg_window"
     android:orientation="vertical">
 
     <!-- Header: which TV + one Connect / Disconnect button -->
@@ -166,17 +166,17 @@
                 </LinearLayout>
 
                 <FrameLayout
-                    android:layout_width="264dp"
-                    android:layout_height="264dp"
-                    android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_dpad">
+                    android:layout_width="280dp"
+                    android:layout_height="280dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_dpad_ring">
 
                     <ImageButton
                         android:id="@+id/btnUp"
                         style="@style/DpadArrow"
                         android:layout_gravity="top|center_horizontal"
                         android:contentDescription="@string/up"
-                        android:padding="20dp"
+                        android:padding="22dp"
                         android:scaleType="fitCenter"
                         android:src="@drawable/ic_up" />
 
@@ -185,7 +185,7 @@
                         style="@style/DpadArrow"
                         android:layout_gravity="bottom|center_horizontal"
                         android:contentDescription="@string/down"
-                        android:padding="20dp"
+                        android:padding="22dp"
                         android:scaleType="fitCenter"
                         android:src="@drawable/ic_down" />
 
@@ -194,7 +194,7 @@
                         style="@style/DpadArrow"
                         android:layout_gravity="start|center_vertical"
                         android:contentDescription="@string/left"
-                        android:padding="20dp"
+                        android:padding="22dp"
                         android:scaleType="fitCenter"
                         android:src="@drawable/ic_left" />
 
@@ -203,21 +203,26 @@
                         style="@style/DpadArrow"
                         android:layout_gravity="end|center_vertical"
                         android:contentDescription="@string/right"
-                        android:padding="20dp"
+                        android:padding="22dp"
                         android:scaleType="fitCenter"
                         android:src="@drawable/ic_right" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnOk"
-                        style="@style/RoundKey.Accent"
-                        android:layout_width="104dp"
-                        android:layout_height="104dp"
+                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                        android:layout_width="100dp"
+                        android:layout_height="100dp"
                         android:layout_gravity="center"
-                        android:fontFamily="sans-serif-medium"
+                        android:background="@drawable/bg_ok"
+                        android:fontFamily="@font/inter_semibold"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
                         android:text="@string/ok"
-                        android:textColor="@color/on_accent"
+                        android:textAllCaps="true"
+                        android:textColor="@color/text_primary"
                         android:textSize="20sp"
-                        app:cornerRadius="52dp" />
+                        app:backgroundTint="@null"
+                        app:cornerRadius="50dp" />
                 </FrameLayout>
 
                 <LinearLayout
@@ -303,7 +308,8 @@
                             android:id="@+id/btnMute"
                             style="@style/RoundKey"
                             android:contentDescription="@string/mute"
-                            app:icon="@drawable/ic_mute" />
+                            app:icon="@drawable/ic_mic"
+                            app:iconTint="@color/neon_teal" />
 
                         <TextView
                             android:layout_width="wrap_content"
@@ -343,6 +349,97 @@
                             android:src="@drawable/ic_down" />
                     </LinearLayout>
                 </LinearLayout>
+
+                <!-- Platform shortcuts: Netflix, YouTube, Disney+, … -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="28dp"
+                    android:clipToPadding="false"
+                    android:overScrollMode="never"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/appRow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="4dp">
+
+                        <ImageButton
+                            android:id="@+id/btnNetflix"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/tile_netflix"
+                            android:contentDescription="@string/app_netflix"
+                            android:padding="18dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_netflix" />
+
+                        <ImageButton
+                            android:id="@+id/btnYoutube"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/tile_youtube"
+                            android:contentDescription="@string/app_youtube"
+                            android:padding="16dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_youtube" />
+
+                        <ImageButton
+                            android:id="@+id/btnDisney"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/tile_disney"
+                            android:contentDescription="@string/app_disney"
+                            android:padding="12dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_disney" />
+
+                        <ImageButton
+                            android:id="@+id/btnPrime"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/tile_prime"
+                            android:contentDescription="@string/app_prime"
+                            android:padding="14dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_prime" />
+
+                        <ImageButton
+                            android:id="@+id/btnSpotify"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/tile_spotify"
+                            android:contentDescription="@string/app_spotify"
+                            android:padding="16dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_spotify" />
+
+                        <ImageButton
+                            android:id="@+id/btnShahid"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:background="@drawable/tile_shahid"
+                            android:contentDescription="@string/app_shahid"
+                            android:padding="16dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_shahid" />
+                    </LinearLayout>
+                </HorizontalScrollView>
+
+                <View
+                    android:layout_width="120dp"
+                    android:layout_height="44dp"
+                    android:layout_marginTop="18dp"
+                    android:background="@drawable/bg_voice_wave"
+                    android:importantForAccessibility="no" />
             </LinearLayout>
 
             <!-- ============ Touchpad page ============ -->

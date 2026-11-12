@@ -2,6 +2,7 @@ package com.irremote.tv.net.androidtv
 
 import android.util.Log
 import com.irremote.tv.control.InputSource
+import com.irremote.tv.control.TvApp
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
 import com.irremote.tv.net.DiscoveredTv
@@ -171,6 +172,15 @@ class AndroidTvSession(
         } catch (error: Exception) {
             TransmitResult.Failed("Android TV typing failed: ${error.message}")
         }
+    }
+
+    override fun launchApp(app: TvApp): TransmitResult = try {
+        ensureOpen()
+        write(ProtoWriter().message(90, ProtoWriter().string(1, app.androidTvLink)))
+        TransmitResult.NETWORK_SENT
+    } catch (error: Exception) {
+        ready = false
+        TransmitResult.Failed("Couldn't open ${app.label}: ${error.message}")
     }
 
     override fun inputSources(): List<InputSource> = InputSource.entries

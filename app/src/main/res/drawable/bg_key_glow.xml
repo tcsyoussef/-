@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Neon ring: teal to violet gradient with a soft halo, dark centre -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#403EF2D0">
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="oval">
+                    <gradient android:type="radial" android:gradientRadius="50%p"
+                        android:startColor="#553EF2D0" android:centerColor="#228B5CFF" android:endColor="#008B5CFF" />
+                </shape>
+            </item>
+            <item android:bottom="8dp" android:left="8dp" android:right="8dp" android:top="8dp">
+                <shape android:shape="oval">
+                    <gradient android:angle="315" android:startColor="@color/neon_teal" android:endColor="@color/violet" />
+                </shape>
+            </item>
+            <item android:bottom="10.5dp" android:left="10.5dp" android:right="10.5dp" android:top="10.5dp">
+                <shape android:shape="oval">
+                    <gradient android:angle="270" android:startColor="#1B2144" android:endColor="#0E1228" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</ripple>

@@ -1,6 +1,7 @@
 package com.irremote.tv.net.roku
 
 import com.irremote.tv.control.InputSource
+import com.irremote.tv.control.TvApp
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
 import com.irremote.tv.net.DiscoveredTv
@@ -43,6 +44,22 @@ class RokuSession(
             if (result is TransmitResult.Failed) return result
         }
         return TransmitResult.NETWORK_SENT
+    }
+
+    override fun launchApp(app: TvApp): TransmitResult {
+        val id = app.rokuId ?: return super.launchApp(app)
+        return try {
+            val request = Request.Builder()
+                .url("http://${tv.ip}:$port/launch/$id")
+                .post(ByteArray(0).toRequestBody(null))
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) TransmitResult.NETWORK_SENT
+                else TransmitResult.Failed("${app.label} isn't installed on this Roku")
+            }
+        } catch (error: Exception) {
+            TransmitResult.Failed("Roku: ${error.message ?: "not reachable"}")
+        }
     }
 
     override fun inputSources(): List<InputSource> = listOf(

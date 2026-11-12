@@ -43,6 +43,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.irremote.tv.bluetooth.BluetoothHidRemote
 import com.irremote.tv.control.ControlLink
+import com.irremote.tv.control.TvApp
 import com.irremote.tv.control.TvCommandRouter
 import com.irremote.tv.databinding.ActivityMainBinding
 import com.irremote.tv.databinding.ItemDeviceBinding
@@ -242,9 +243,17 @@ class MainActivity : AppCompatActivity() {
         binding.btnConnection.apply {
             text = getString(if (showDisconnect) R.string.disconnect else R.string.connect)
             setIconResource(if (showDisconnect) R.drawable.ic_close else R.drawable.ic_link)
-            backgroundTintList = getColorStateList(if (showDisconnect) R.color.surface_high else R.color.accent)
-            setTextColor(getColor(if (showDisconnect) R.color.text_primary else R.color.on_accent))
-            iconTint = getColorStateList(if (showDisconnect) R.color.text_primary else R.color.on_accent)
+            if (showDisconnect) {
+                setBackgroundResource(0)
+                backgroundTintList = getColorStateList(R.color.surface_high)
+                setTextColor(getColor(R.color.text_primary))
+                iconTint = getColorStateList(R.color.text_primary)
+            } else {
+                setBackgroundResource(R.drawable.bg_gradient_pill)
+                backgroundTintList = null
+                setTextColor(getColor(R.color.on_accent))
+                iconTint = getColorStateList(R.color.on_accent)
+            }
         }
     }
 
@@ -690,6 +699,36 @@ class MainActivity : AppCompatActivity() {
         binding.btnInput.setOnClickListener {
             ButtonHaptics.click(it)
             onInputPressed()
+        }
+        bindAppShortcuts()
+    }
+
+    private fun bindAppShortcuts() {
+        listOf(
+            binding.btnNetflix to TvApp.NETFLIX,
+            binding.btnYoutube to TvApp.YOUTUBE,
+            binding.btnDisney to TvApp.DISNEY_PLUS,
+            binding.btnPrime to TvApp.PRIME_VIDEO,
+            binding.btnSpotify to TvApp.SPOTIFY,
+            binding.btnShahid to TvApp.SHAHID
+        ).forEach { (view, app) ->
+            view.setOnClickListener {
+                ButtonHaptics.click(it)
+                launchApp(app)
+            }
+        }
+    }
+
+    private fun launchApp(app: TvApp) {
+        if (!requireConnection()) return
+        if (activeLink == ControlLink.IR) {
+            snack(getString(R.string.app_need_wifi), getString(R.string.connect)) { openConnectSheet(ControlLink.WIFI) }
+            return
+        }
+        snack(getString(R.string.app_opening_fmt, app.label))
+        ioExecutor.execute {
+            val result = router.launchApp(app)
+            mainHandler.post { onResult(result) }
         }
     }
 

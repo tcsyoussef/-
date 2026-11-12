@@ -30,6 +30,7 @@ class MockAndroidTv : AutoCloseable {
     @Volatile var shownCode: String? = null
     val keyCodes = CopyOnWriteArrayList<Int>()
     val batchTexts = CopyOnWriteArrayList<String>()
+    val appLinks = CopyOnWriteArrayList<String>()
     @Volatile var sendImeFocus = false
 
     private fun server(): SSLServerSocket =
@@ -107,6 +108,7 @@ class MockAndroidTv : AutoCloseable {
                     }
                     msg.has(10) -> msg.message(10)?.varint(1)?.let { keyCodes += it.toInt() }
                     msg.has(21) -> msg.message(21)?.message(3)?.message(2)?.string(3)?.let { batchTexts += it }
+                    msg.has(90) -> msg.message(90)?.string(1)?.let { appLinks += it }
                 }
             }
         }

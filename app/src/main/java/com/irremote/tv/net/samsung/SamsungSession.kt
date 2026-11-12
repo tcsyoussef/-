@@ -3,6 +3,7 @@ package com.irremote.tv.net.samsung
 import android.util.Base64
 import android.util.Log
 import com.irremote.tv.control.InputSource
+import com.irremote.tv.control.TvApp
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
 import com.irremote.tv.net.DiscoveredTv
@@ -147,6 +148,18 @@ class SamsungSession(
                 .put("DataOfCmd", "base64")
                 .put("TypeOfRemote", "SendInputString")
         )
+    }
+
+    override fun launchApp(app: TvApp): TransmitResult {
+        val id = app.samsungId ?: return super.launchApp(app)
+        val ws = socket
+        if (ws == null || !connected) return TransmitResult.Failed("Samsung TV disconnected")
+        val payload = JSONObject().put("method", "ms.channel.emit").put("params", JSONObject()
+            .put("event", "ed.apps.launch")
+            .put("to", "host")
+            .put("data", JSONObject().put("appId", id).put("action_type", "DEEP_LINK")))
+        return if (ws.send(payload.toString())) TransmitResult.NETWORK_SENT
+        else TransmitResult.Failed("Samsung TV: send failed")
     }
 
     override fun inputSources(): List<InputSource> = InputSource.entries
