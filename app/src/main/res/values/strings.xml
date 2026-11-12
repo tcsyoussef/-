@@ -41,8 +41,6 @@
     <string name="home">Home</string>
     <string name="back">Back</string>
     <string name="menu">Menu</string>
-    <string name="input_title">Choose input</string>
-    <string name="input_unavailable">Input can\'t be changed over Bluetooth. Connect with Wi‑Fi or Infrared.</string>
 
     <!-- Keyboard -->
     <string name="keyboard_direct_hint">Open a search box on your TV, then type here. Letters appear on the TV as you type.</string>

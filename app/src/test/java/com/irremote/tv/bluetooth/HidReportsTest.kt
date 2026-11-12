@@ -29,7 +29,7 @@ class HidReportsTest {
         assertEquals(HidReports.Key.Consumer(0x224), HidReports.keyFor(RemoteCommand.BACK))
         assertEquals(HidReports.Key.Keyboard(0x52), HidReports.keyFor(RemoteCommand.UP))
         assertEquals(HidReports.Key.Keyboard(0x27), HidReports.keyFor(RemoteCommand.DIGIT_0))
-        assertNull(HidReports.keyFor(RemoteCommand.INPUT))
+        assertEquals(HidReports.Key.Keyboard(0x3C), HidReports.keyFor(RemoteCommand.INPUT))
     }
 
     @Test

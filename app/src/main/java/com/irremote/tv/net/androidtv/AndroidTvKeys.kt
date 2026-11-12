@@ -8,6 +8,9 @@ object AndroidTvKeys {
     const val KEYCODE_DEL = 67
     const val KEYCODE_TV_INPUT = 178
 
+    /** KEYCODE_F3: opens the Google TV launcher's Inputs panel; most TVs ignore KEYCODE_TV_INPUT from the remote service. */
+    const val KEYCODE_INPUTS_PANEL = 133
+
     fun keyCode(command: RemoteCommand): Int = when (command) {
         RemoteCommand.POWER -> 26
         RemoteCommand.MUTE -> 164
@@ -23,7 +26,7 @@ object AndroidTvKeys {
         RemoteCommand.HOME -> 3
         RemoteCommand.BACK -> 4
         RemoteCommand.MENU -> 82
-        RemoteCommand.INPUT -> 178
+        RemoteCommand.INPUT -> KEYCODE_INPUTS_PANEL
         RemoteCommand.DIGIT_0 -> 7
         RemoteCommand.DIGIT_1 -> 8
         RemoteCommand.DIGIT_2 -> 9

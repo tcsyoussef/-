@@ -89,7 +89,7 @@ class AndroidTvProtocolTest {
             assertTrue(wifi.sendText("\b") is TransmitResult.Sent)
             assertTrue(wifi.selectInput(com.irremote.tv.control.InputSource.HDMI2) is TransmitResult.Sent)
             waitFor { tv.keyCodes.size >= 7 && tv.batchTexts.isNotEmpty() }
-            assertEquals(listOf(3, 178, 82, 23, 11, 67, 244), tv.keyCodes.toList())
+            assertEquals(listOf(3, 133, 82, 23, 11, 67, 244), tv.keyCodes.toList())
             assertEquals(listOf("h"), tv.batchTexts.toList())
 
             // Reconnect with saved cert: no pairing needed

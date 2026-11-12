@@ -177,7 +177,7 @@ class AndroidTvSession(
 
     override fun selectInput(source: InputSource): TransmitResult = sendKeyCode(
         when (source) {
-            InputSource.INPUT_MENU -> AndroidTvKeys.KEYCODE_TV_INPUT
+            InputSource.INPUT_MENU -> AndroidTvKeys.KEYCODE_INPUTS_PANEL
             InputSource.HDMI1 -> 243
             InputSource.HDMI2 -> 244
             InputSource.HDMI3 -> 245

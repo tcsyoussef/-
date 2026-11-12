@@ -53,7 +53,8 @@ object HidReports {
         RemoteCommand.HOME -> Key.Consumer(0x223)
         RemoteCommand.BACK -> Key.Consumer(0x224)
         RemoteCommand.MENU -> Key.Consumer(0x40)
-        RemoteCommand.INPUT -> null
+        // F3 reaches the TV as KEYCODE_F3, which opens the Google TV Inputs panel
+        RemoteCommand.INPUT -> Key.Keyboard(0x3C)
         RemoteCommand.DIGIT_0 -> Key.Keyboard(0x27)
         RemoteCommand.DIGIT_1 -> Key.Keyboard(0x1E)
         RemoteCommand.DIGIT_2 -> Key.Keyboard(0x1F)

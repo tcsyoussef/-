@@ -39,7 +39,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.irremote.tv.bluetooth.BluetoothHidRemote
 import com.irremote.tv.control.ControlLink
-import com.irremote.tv.control.InputSource
 import com.irremote.tv.control.TvCommandRouter
 import com.irremote.tv.databinding.ActivityMainBinding
 import com.irremote.tv.databinding.ItemDeviceBinding
@@ -674,51 +673,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun onInputPressed() {
         if (!requireConnection()) return
-        val sources = router.inputSources()
-        when {
-            sources.isEmpty() -> snack(getString(R.string.input_unavailable))
-            sources.size == 1 -> sendInput(sources.first())
-            else -> showInputSheet(sources)
-        }
-    }
-
-    private fun showInputSheet(sources: List<InputSource>) {
-        val dialog = BottomSheetDialog(this)
-        val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(12), dp(22), dp(28))
-        }
-        content.addView(View(this).apply {
-            background = getDrawable(R.drawable.bg_sheet_handle)
-            layoutParams = LinearLayout.LayoutParams(dp(40), dp(5)).apply { gravity = Gravity.CENTER_HORIZONTAL }
-        })
-        content.addView(TextView(this).apply {
-            text = getString(R.string.input_title)
-            textSize = 22f
-            setTextColor(getColor(R.color.text_primary))
-            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-            setPadding(0, dp(18), 0, dp(4))
-        })
-        sources.forEach { source ->
-            val icon = when (source) {
-                InputSource.INPUT_MENU -> R.drawable.ic_input
-                InputSource.TV -> R.drawable.ic_tv
-                InputSource.SETTINGS -> R.drawable.ic_menu
-                else -> R.drawable.ic_settings_input
-            }
-            addDeviceRow(content, source.label, "", icon) {
-                dialog.dismiss()
-                sendInput(source)
-            }.deviceSubtitle.visibility = View.GONE
-        }
-        dialog.setContentView(content)
-        dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
-        dialog.show()
-    }
-
-    private fun sendInput(source: InputSource) {
         ioExecutor.execute {
-            val result = router.selectInput(selectedBrand, source)
+            val result = router.send(selectedBrand, RemoteCommand.INPUT)
             mainHandler.post { onResult(result) }
         }
     }
