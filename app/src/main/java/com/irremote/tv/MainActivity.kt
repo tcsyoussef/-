@@ -3,34 +3,47 @@ package com.irremote.tv
 import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.Editable
 import android.text.InputFilter
 import android.text.InputType
+import android.text.TextWatcher
+import android.view.Gravity
 import android.view.InputDevice
 import android.view.KeyEvent
+import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.GridLayout
-import android.widget.Toast
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.chip.Chip
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import com.irremote.tv.bluetooth.BluetoothHidRemote
 import com.irremote.tv.control.ControlLink
+import com.irremote.tv.control.InputSource
 import com.irremote.tv.control.TvCommandRouter
 import com.irremote.tv.databinding.ActivityMainBinding
-import com.irremote.tv.input.IrCommandRunner
+import com.irremote.tv.databinding.ItemDeviceBinding
+import com.irremote.tv.databinding.SheetConnectBinding
 import com.irremote.tv.input.PointerController
 import com.irremote.tv.input.TouchpadView
 import com.irremote.tv.input.TvKeyboardNavigator
@@ -57,16 +70,31 @@ class MainActivity : AppCompatActivity() {
     private lateinit var router: TvCommandRouter
     private lateinit var wifi: WifiRemoteManager
     private lateinit var bluetooth: BluetoothHidRemote
-    private lateinit var runner: IrCommandRunner
+    private lateinit var ir: AndroidIrTransmitter
+    private lateinit var prefs: SharedPreferences
+
+    /** The connection the user chose; null = disconnected. */
+    private var activeLink: ControlLink? = null
+    private var connecting: String? = null
     private var selectedBrand: TvBrand = TvBrand.HAIER
-    private var warnedMissingIr = false
-    private var lastScannedDevices: List<DiscoveredTv> = emptyList()
+
+    private var sheet: BottomSheetDialog? = null
+    private var sheetBinding: SheetConnectBinding? = null
     private var promptDialog: AlertDialog? = null
+    private var scanning = false
+    private var foundTvs: List<DiscoveredTv> = emptyList()
+    private var pendingWifiRow: ItemDeviceBinding? = null
+    private var btConnecting = false
 
     private val keyboardNavigator = TvKeyboardNavigator()
     private val hardwarePointer = PointerController(stepPixels = 36f, minIntervalMs = 70L)
+    private var gridTypingBusy = false
+    private var suppressTypeWatcher = false
+    private var lastTyped = ""
+
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private val netExecutor = Executors.newSingleThreadExecutor()
+    private val scanExecutor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val identity by lazy { ClientIdentity.loadOrCreate(File(filesDir, "atv_client.p12")) }
 
@@ -75,9 +103,9 @@ class MainActivity : AppCompatActivity() {
     ) { granted ->
         if (granted.values.all { it }) {
             bluetooth.start()
-            refreshBluetoothDevices()
+            renderBluetoothDevices()
         } else {
-            setBluetoothStatus(getString(R.string.bt_need_permission), connected = false)
+            setSheetStatus(getString(R.string.bt_need_permission), error = true)
         }
     }
 
@@ -86,186 +114,254 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        val ir = AndroidIrTransmitter(this)
+        prefs = getSharedPreferences("ui", Context.MODE_PRIVATE)
+        ir = AndroidIrTransmitter(this)
         wifi = WifiRemoteManager(SharedPrefsPairingStore(this), identity = { identity })
         bluetooth = BluetoothHidRemote(this)
         router = TvCommandRouter(ir, wifi, bluetooth.takeIf { it.isSupported })
-        runner = IrCommandRunner(sender = { brand, command -> router.send(brand, command) })
+        selectedBrand = runCatching { TvBrand.valueOf(prefs.getString(PREF_BRAND, null) ?: "") }
+            .getOrDefault(TvBrand.HAIER)
 
-        setupStatus()
-        setupLinkToggle()
-        setupWifiPanel()
-        setupBluetoothPanel()
-        setupBrandSpinner()
-        setupModeToggle()
-        bindCoreButtons()
-        bindClassicButtons()
+        bluetooth.listener = object : BluetoothHidRemote.Listener {
+            override fun onBluetoothState(message: String, connected: Boolean) {
+                mainHandler.post { onBluetoothState(message, connected) }
+            }
+        }
+
+        binding.btnConnection.setOnClickListener {
+            ButtonHaptics.click(it)
+            if (activeLink != null || connecting != null) disconnect() else openConnectSheet()
+        }
+        binding.statusArea.setOnClickListener {
+            ButtonHaptics.click(it)
+            openConnectSheet()
+        }
+        setupPages()
+        bindRemoteKeys()
         setupTouchpad()
         setupKeyboard()
-        showMode(Mode.MOUSE)
-        applyLink(ControlLink.IR)
+        updateHeader()
 
-        if (!ir.hasBuiltInEmitter) {
-            // Prefer Wi‑Fi when phone has no IR
-            binding.linkToggle.check(R.id.linkWifi)
-        }
-
-        // Optional automation:
-        // adb shell am start -n com.irremote.tv/.MainActivity --es wifi_ip 10.0.2.2 --esa send_commands HOME,INPUT,MENU
-        intent.getStringExtra(EXTRA_WIFI_IP)?.trim()?.takeIf { it.isNotEmpty() }?.let { ip ->
-            binding.linkToggle.check(R.id.linkWifi)
-            binding.wifiInclude.wifiIpInput.setText(ip)
-            connectWifi(ip)
-            val pending = intent.getStringArrayExtra(EXTRA_SEND_COMMANDS)
-            if (!pending.isNullOrEmpty()) {
-                scheduleAutomationCommands(pending)
-            }
-        }
-    }
-
-    private fun scheduleAutomationCommands(names: Array<String>) {
-        ioExecutor.execute {
-            // Wait for Wi‑Fi connect to finish
-            var waits = 0
-            while (!wifi.isReady && waits < 100) {
-                Thread.sleep(150)
-                waits++
-            }
-            if (!wifi.isReady) return@execute
-            for (name in names) {
-                val command = runCatching { RemoteCommand.valueOf(name.trim().uppercase()) }.getOrNull()
-                    ?: continue
-                val result = router.send(selectedBrand, command)
-                mainHandler.post { showResult(command, result) }
-                Thread.sleep(250)
-            }
-        }
-    }
-
-    private fun setupStatus() {
-        refreshStatusBanner()
-    }
-
-    private fun refreshStatusBanner() {
-        when (router.link) {
-            ControlLink.IR -> {
-                if (router.statusReady()) {
-                    binding.statusText.text = getString(R.string.status_ir_available)
-                    binding.statusText.setTextColor(getColor(R.color.accent_teal))
-                    binding.usbStatusText.text = getString(R.string.status_aim_tv)
-                } else {
-                    binding.statusText.text = getString(R.string.status_ir_unavailable)
-                    binding.statusText.setTextColor(getColor(R.color.accent_red))
-                    binding.usbStatusText.text = getString(R.string.status_need_ir_phone)
-                }
-                binding.usbStatusText.setTextColor(getColor(R.color.text_muted))
-            }
-            ControlLink.WIFI -> {
-                binding.statusText.text = getString(R.string.status_wifi_mode)
-                binding.statusText.setTextColor(getColor(R.color.accent_teal))
-                val tv = wifi.connectedTv
-                val label = if (tv != null && wifi.isReady) getString(R.string.wifi_connected_fmt, tv.displayLabel) else null
-                val text = label ?: getString(R.string.wifi_not_connected)
-                val color = getColor(if (label != null) R.color.accent_teal else R.color.accent_amber)
-                binding.usbStatusText.text = text
-                binding.usbStatusText.setTextColor(color)
-                binding.wifiInclude.wifiStatusText.text = text
-                binding.wifiInclude.wifiStatusText.setTextColor(color)
-            }
-            ControlLink.BLUETOOTH -> {
-                binding.statusText.text = getString(R.string.status_bt_mode)
-                binding.statusText.setTextColor(getColor(R.color.accent_teal))
-                val name = bluetooth.connectedName
-                if (name != null && bluetooth.isReady) {
-                    binding.usbStatusText.text = getString(R.string.bt_connected_fmt, name)
-                    binding.usbStatusText.setTextColor(getColor(R.color.accent_teal))
-                } else {
-                    binding.usbStatusText.text = getString(R.string.bt_not_connected)
-                    binding.usbStatusText.setTextColor(getColor(R.color.accent_amber))
-                }
-            }
-        }
-    }
-
-    private fun setupLinkToggle() {
-        binding.linkToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
-            when (checkedId) {
-                R.id.linkIr -> applyLink(ControlLink.IR)
-                R.id.linkWifi -> applyLink(ControlLink.WIFI)
-                R.id.linkBluetooth -> applyLink(ControlLink.BLUETOOTH)
-            }
-        }
-    }
-
-    private fun applyLink(link: ControlLink) {
-        router.link = link
-        binding.wifiInclude.root.visibility = if (link == ControlLink.WIFI) View.VISIBLE else View.GONE
-        binding.bluetoothInclude.root.visibility = if (link == ControlLink.BLUETOOTH) View.VISIBLE else View.GONE
-        // Brand IR codes only matter for IR
-        val showBrand = link == ControlLink.IR
-        binding.brandLabel.visibility = if (showBrand) View.VISIBLE else View.GONE
-        binding.brandSpinner.visibility = if (showBrand) View.VISIBLE else View.GONE
-        refreshStatusBanner()
-        when (link) {
-            ControlLink.IR -> if (!router.statusReady() && !warnedMissingIr) showMissingIrDialog()
-            ControlLink.WIFI -> refreshLastTvButton()
-            ControlLink.BLUETOOTH -> prepareBluetooth()
-        }
-    }
-
-    // ---------------------------------------------------------------- Wi‑Fi
-
-    private fun setupWifiPanel() {
-        val panel = binding.wifiInclude
-        panel.btnWifiConnect.setOnClickListener {
-            ButtonHaptics.click(it)
-            val typed = panel.wifiIpInput.text?.toString()?.trim().orEmpty()
-            val scanned = lastScannedDevices.firstOrNull { d -> d.ip == typed }
-                ?: lastScannedDevices.firstOrNull()?.takeIf { typed.isEmpty() }
-            if (scanned != null) {
-                panel.wifiIpInput.setText(scanned.ip)
-                connectTv(scanned)
-                return@setOnClickListener
-            }
-            if (typed.isEmpty()) {
-                panel.wifiStatusText.text = getString(R.string.wifi_need_ip)
-                panel.wifiStatusText.setTextColor(getColor(R.color.accent_amber))
-                return@setOnClickListener
-            }
-            connectWifi(typed)
-        }
-        panel.btnWifiScan.setOnClickListener {
-            ButtonHaptics.click(it)
-            scanWifi()
-        }
-        panel.btnWifiLast.setOnClickListener {
-            ButtonHaptics.click(it)
-            wifi.lastTv()?.let { tv ->
-                panel.wifiIpInput.setText(tv.ip)
-                connectTv(tv)
-            }
-        }
-        refreshLastTvButton()
-    }
-
-    private fun refreshLastTvButton() {
-        val button = binding.wifiInclude.btnWifiLast
-        val last = wifi.lastTv()
-        if (last == null || (wifi.isReady && wifi.connectedTv?.ip == last.ip)) {
-            button.visibility = View.GONE
+        val automationIp = intent.getStringExtra(EXTRA_WIFI_IP)?.trim()?.takeIf { it.isNotEmpty() }
+        if (automationIp != null) {
+            connectWifi(automationIp, null)
+            intent.getStringArrayExtra(EXTRA_SEND_COMMANDS)?.takeIf { it.isNotEmpty() }
+                ?.let { scheduleAutomationCommands(it) }
         } else {
-            button.text = getString(R.string.wifi_last_tv_fmt, last.displayLabel)
-            button.visibility = View.VISIBLE
+            restoreLastConnection()
         }
     }
 
-    private fun scanWifi() {
-        val panel = binding.wifiInclude
-        panel.wifiScanResultText.text = getString(R.string.wifi_scanning)
-        panel.wifiDeviceList.removeAllViews()
-        panel.btnWifiScan.isEnabled = false
-        netExecutor.execute {
+    // ------------------------------------------------------------ connection state
+
+    private fun restoreLastConnection() {
+        when (prefs.getString(PREF_LINK, null)) {
+            ControlLink.WIFI.name -> {
+                val last = wifi.lastTv()
+                if (last != null) connectTv(last, null) else openConnectSheet()
+            }
+            ControlLink.IR.name -> if (ir.hasBuiltInEmitter) activate(ControlLink.IR) else openConnectSheet()
+            ControlLink.BLUETOOTH.name -> {
+                if (bluetooth.isSupported && bluetooth.hasPermission() && bluetooth.isEnabled) {
+                    val address = prefs.getString(PREF_BT, null)
+                    val device = bluetooth.bondedDevices().firstOrNull { it.address == address }
+                    if (device != null) {
+                        connecting = bluetooth.deviceName(device)
+                        btConnecting = true
+                        bluetooth.connect(device)
+                        updateHeader()
+                    } else {
+                        bluetooth.start()
+                    }
+                }
+            }
+            else -> mainHandler.postDelayed({ if (activeLink == null) openConnectSheet() }, 350)
+        }
+    }
+
+    private fun activate(link: ControlLink) {
+        activeLink = link
+        connecting = null
+        router.link = link
+        prefs.edit().putString(PREF_LINK, link.name).apply()
+        updateHeader()
+        updateKeyboardMode()
+    }
+
+    private fun disconnect() {
+        when (activeLink) {
+            ControlLink.WIFI -> netExecutor.execute { wifi.disconnect() }
+            ControlLink.BLUETOOTH -> bluetooth.disconnect()
+            else -> Unit
+        }
+        if (btConnecting) bluetooth.disconnect()
+        btConnecting = false
+        if (connecting != null && activeLink == null) netExecutor.execute { wifi.disconnect() }
+        activeLink = null
+        connecting = null
+        prefs.edit().remove(PREF_LINK).apply()
+        updateHeader()
+        updateKeyboardMode()
+        snack(getString(R.string.disconnected))
+    }
+
+    private fun isConnected(): Boolean = when (activeLink) {
+        null -> false
+        ControlLink.IR -> ir.hasBuiltInEmitter
+        ControlLink.WIFI -> wifi.isReady
+        ControlLink.BLUETOOTH -> bluetooth.isReady
+    }
+
+    private fun updateHeader() {
+        val link = activeLink
+        val (dotColor, label, name) = when {
+            connecting != null -> Triple(R.color.warning, getString(R.string.status_connecting), connecting!!)
+            link == ControlLink.WIFI && wifi.isReady -> {
+                val tv = wifi.connectedTv!!
+                Triple(R.color.success, getString(R.string.status_wifi_fmt, tv.protocol.displayName), tv.name)
+            }
+            link == ControlLink.BLUETOOTH && bluetooth.isReady ->
+                Triple(R.color.success, getString(R.string.status_bluetooth), bluetooth.connectedName ?: "TV")
+            link == ControlLink.IR ->
+                Triple(R.color.success, getString(R.string.status_ir_fmt, selectedBrand.displayName), getString(R.string.ir_tv_name))
+            link != null -> Triple(R.color.warning, getString(R.string.status_not_connected), getString(R.string.no_tv))
+            else -> Triple(R.color.text_faint, getString(R.string.status_not_connected), getString(R.string.no_tv))
+        }
+        binding.statusDot.setColorFilter(getColor(dotColor))
+        binding.statusLabel.text = label
+        binding.tvName.text = name
+
+        val showDisconnect = link != null || connecting != null
+        binding.btnConnection.apply {
+            text = getString(if (showDisconnect) R.string.disconnect else R.string.connect)
+            setIconResource(if (showDisconnect) R.drawable.ic_close else R.drawable.ic_link)
+            backgroundTintList = getColorStateList(if (showDisconnect) R.color.surface_high else R.color.accent)
+            setTextColor(getColor(if (showDisconnect) R.color.text_primary else R.color.on_accent))
+            iconTint = getColorStateList(if (showDisconnect) R.color.text_primary else R.color.on_accent)
+        }
+    }
+
+    // ------------------------------------------------------------ connect sheet
+
+    private fun openConnectSheet(tab: ControlLink? = null) {
+        if (sheet?.isShowing == true) return
+        val sb = SheetConnectBinding.inflate(layoutInflater)
+        val dialog = BottomSheetDialog(this)
+        dialog.setContentView(sb.root)
+        dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        dialog.behavior.skipCollapsed = true
+        dialog.setOnDismissListener {
+            if (sheet === dialog) {
+                sheet = null
+                sheetBinding = null
+                pendingWifiRow = null
+            }
+        }
+        sheet = dialog
+        sheetBinding = sb
+
+        sb.sheetTabs.addOnButtonCheckedListener { _, id, checked ->
+            if (!checked) return@addOnButtonCheckedListener
+            showSheetSection(
+                when (id) {
+                    R.id.sheetTabBt -> ControlLink.BLUETOOTH
+                    R.id.sheetTabIr -> ControlLink.IR
+                    else -> ControlLink.WIFI
+                }
+            )
+        }
+        sb.btnSearchAgain.setOnClickListener { ButtonHaptics.click(it); startScan() }
+        sb.btnShowIp.setOnClickListener {
+            sb.ipGroup.visibility = View.VISIBLE
+            sb.btnShowIp.visibility = View.GONE
+            sb.ipInput.requestFocus()
+        }
+        val connectTyped = {
+            val ip = sb.ipInput.text?.toString()?.trim().orEmpty()
+            if (ip.isEmpty()) setSheetStatus(getString(R.string.wifi_need_ip), error = true)
+            else connectWifi(ip, null)
+        }
+        sb.btnIpConnect.setOnClickListener { ButtonHaptics.click(it); connectTyped() }
+        sb.ipInput.setOnEditorActionListener { _, _, _ -> connectTyped(); true }
+        sb.btnBtVisible.setOnClickListener { ButtonHaptics.click(it); makeBluetoothVisible() }
+        setupIrSection(sb)
+
+        val initial = tab ?: activeLink ?: runCatching {
+            ControlLink.valueOf(prefs.getString(PREF_LINK, null) ?: "")
+        }.getOrDefault(ControlLink.WIFI)
+        sb.sheetTabs.check(
+            when (initial) {
+                ControlLink.BLUETOOTH -> R.id.sheetTabBt
+                ControlLink.IR -> R.id.sheetTabIr
+                ControlLink.WIFI -> R.id.sheetTabWifi
+            }
+        )
+        showSheetSection(initial)
+        dialog.show()
+    }
+
+    private fun showSheetSection(link: ControlLink) {
+        val sb = sheetBinding ?: return
+        sb.wifiSection.visibility = if (link == ControlLink.WIFI) View.VISIBLE else View.GONE
+        sb.btSection.visibility = if (link == ControlLink.BLUETOOTH) View.VISIBLE else View.GONE
+        sb.irSection.visibility = if (link == ControlLink.IR) View.VISIBLE else View.GONE
+        sb.sheetStatus.visibility = View.GONE
+        when (link) {
+            ControlLink.WIFI -> {
+                renderWifiDevices()
+                if (!scanning && foundTvs.isEmpty()) startScan()
+            }
+            ControlLink.BLUETOOTH -> if (prepareBluetooth()) renderBluetoothDevices()
+            ControlLink.IR -> Unit
+        }
+    }
+
+    private fun setSheetStatus(message: String?, error: Boolean = false) {
+        val sb = sheetBinding ?: return
+        if (message.isNullOrBlank()) {
+            sb.sheetStatus.visibility = View.GONE
+            return
+        }
+        sb.sheetStatus.text = message
+        sb.sheetStatus.setTextColor(getColor(if (error) R.color.power else R.color.warning))
+        sb.sheetStatus.visibility = View.VISIBLE
+    }
+
+    private fun addDeviceRow(
+        container: LinearLayout,
+        name: String,
+        subtitle: String,
+        iconRes: Int,
+        onClick: (ItemDeviceBinding) -> Unit
+    ): ItemDeviceBinding {
+        val row = ItemDeviceBinding.inflate(LayoutInflater.from(this), container, false)
+        row.deviceName.text = name
+        row.deviceSubtitle.text = subtitle
+        row.deviceIcon.setImageResource(iconRes)
+        row.root.setOnClickListener {
+            ButtonHaptics.click(it)
+            onClick(row)
+        }
+        container.addView(row.root)
+        return row
+    }
+
+    private fun setRowBusy(row: ItemDeviceBinding?, busy: Boolean) {
+        row ?: return
+        row.deviceProgress.visibility = if (busy) View.VISIBLE else View.GONE
+        row.deviceChevron.visibility = if (busy) View.GONE else View.VISIBLE
+    }
+
+    // ------------------------------------------------------------ Wi‑Fi
+
+    private fun startScan() {
+        val sb = sheetBinding ?: return
+        if (scanning) return
+        scanning = true
+        sb.searchingRow.visibility = View.VISIBLE
+        sb.wifiEmpty.visibility = View.GONE
+        sb.btnSearchAgain.isEnabled = false
+        scanExecutor.execute {
             val devices = try {
                 val prefix = WifiTvScanner(this).localSubnetPrefix()
                 if (prefix == null) emptyList() else TvDiscovery(wifi).scanSubnet(prefix)
@@ -273,156 +369,144 @@ class MainActivity : AppCompatActivity() {
                 emptyList()
             }
             mainHandler.post {
-                lastScannedDevices = devices
-                panel.btnWifiScan.isEnabled = true
-                panel.wifiDeviceList.removeAllViews()
-                if (devices.isEmpty()) {
-                    panel.wifiScanResultText.text = getString(R.string.wifi_scan_none)
-                } else {
-                    panel.wifiScanResultText.text = getString(R.string.wifi_scan_found, devices.size)
-                    devices.forEach { device -> addWifiDeviceRow(device) }
-                    if (devices.size == 1 && !wifi.isReady) {
-                        panel.wifiIpInput.setText(devices[0].ip)
-                        connectTv(devices[0])
-                    }
-                }
+                scanning = false
+                foundTvs = devices
+                val s = sheetBinding ?: return@post
+                s.searchingRow.visibility = View.GONE
+                s.btnSearchAgain.isEnabled = true
+                renderWifiDevices()
+                if (devices.isEmpty() && wifi.lastTv() == null) s.wifiEmpty.visibility = View.VISIBLE
             }
         }
     }
 
-    private fun addWifiDeviceRow(device: DiscoveredTv) {
-        val button = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-            text = device.displayLabel
-            isAllCaps = false
-            setOnClickListener {
-                ButtonHaptics.click(it)
-                binding.wifiInclude.wifiIpInput.setText(device.ip)
-                connectTv(device)
+    private fun renderWifiDevices() {
+        val sb = sheetBinding ?: return
+        sb.wifiDeviceList.removeAllViews()
+        val last = wifi.lastTv()
+        val list = ArrayList<DiscoveredTv>()
+        if (last != null) list += foundTvs.firstOrNull { it.ip == last.ip } ?: last
+        list += foundTvs.filter { it.ip != last?.ip }
+        for (tv in list) {
+            val subtitle = buildString {
+                append(tv.protocol.displayName)
+                if (tv.ip == last?.ip) append(" · ").append(getString(R.string.wifi_last_used))
+            }
+            addDeviceRow(sb.wifiDeviceList, tv.name, subtitle, R.drawable.ic_tv) { row ->
+                pendingWifiRow = row
+                connectTv(tv, row)
             }
         }
-        binding.wifiInclude.wifiDeviceList.addView(button)
     }
 
     private val tvPrompt = PromptListener { message ->
         mainHandler.post {
-            binding.wifiInclude.wifiStatusText.text = message
-            binding.wifiInclude.wifiStatusText.setTextColor(getColor(R.color.accent_amber))
+            setSheetStatus(message)
             promptDialog?.dismiss()
-            promptDialog = AlertDialog.Builder(this)
-                .setTitle(R.string.wifi_prompt_title)
+            promptDialog = MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.prompt_title)
                 .setMessage(message)
-                .setPositiveButton(android.R.string.ok, null)
+                .setPositiveButton(R.string.ok, null)
                 .show()
         }
     }
 
-    private fun connectWifi(ip: String) = startConnect { wifi.connectIp(ip, tvPrompt) }
+    private fun connectWifi(ip: String, row: ItemDeviceBinding?) =
+        startConnect(ip, row) { wifi.connectIp(ip, tvPrompt) }
 
-    private fun connectTv(tv: DiscoveredTv) = startConnect { wifi.connect(tv, tvPrompt) }
+    private fun connectTv(tv: DiscoveredTv, row: ItemDeviceBinding?) =
+        startConnect(tv.name, row) { wifi.connect(tv, tvPrompt) }
 
-    private fun startConnect(block: () -> ConnectOutcome) {
-        binding.wifiInclude.wifiStatusText.text = getString(R.string.wifi_connecting)
-        binding.wifiInclude.wifiStatusText.setTextColor(getColor(R.color.accent_amber))
-        binding.wifiInclude.btnWifiConnect.isEnabled = false
+    private fun startConnect(label: String, row: ItemDeviceBinding?, block: () -> ConnectOutcome) {
+        connecting = label
+        if (activeLink == ControlLink.WIFI) activeLink = null
+        updateHeader()
+        setRowBusy(row, true)
+        setSheetStatus(getString(R.string.connecting_fmt, label))
         netExecutor.execute {
             val outcome = block()
-            mainHandler.post { handleOutcome(outcome) }
+            mainHandler.post { handleOutcome(outcome, row) }
         }
     }
 
-    private fun handleOutcome(outcome: ConnectOutcome) {
+    private fun handleOutcome(outcome: ConnectOutcome, row: ItemDeviceBinding?) {
         promptDialog?.dismiss()
         promptDialog = null
-        binding.wifiInclude.btnWifiConnect.isEnabled = true
+        setRowBusy(row, false)
         when (outcome) {
             is ConnectOutcome.Connected -> {
-                Toast.makeText(
-                    this,
-                    getString(R.string.wifi_connected_fmt, outcome.session.tv.displayLabel),
-                    Toast.LENGTH_SHORT
-                ).show()
-                refreshStatusBanner()
-                refreshLastTvButton()
+                activate(ControlLink.WIFI)
+                sheet?.dismiss()
+                snack(getString(R.string.connected_fmt, outcome.session.tv.name))
             }
-            is ConnectOutcome.NeedsPin -> showPinDialog(outcome)
+            is ConnectOutcome.NeedsPin -> showPinDialog(outcome, row)
             is ConnectOutcome.Failed -> {
-                Toast.makeText(this, outcome.reason, Toast.LENGTH_LONG).show()
-                refreshStatusBanner()
-                binding.wifiInclude.wifiStatusText.text = getString(R.string.wifi_connect_failed_fmt, outcome.reason)
-                binding.wifiInclude.wifiStatusText.setTextColor(getColor(R.color.accent_red))
+                val label = connecting
+                connecting = null
+                updateHeader()
+                if (sheet?.isShowing == true) {
+                    setSheetStatus(outcome.reason, error = true)
+                } else {
+                    snack(
+                        if (label != null) getString(R.string.reconnect_failed_fmt, label) else outcome.reason,
+                        actionLabel = getString(R.string.connect)
+                    ) { openConnectSheet(ControlLink.WIFI) }
+                }
             }
         }
     }
 
-    private fun showPinDialog(request: ConnectOutcome.NeedsPin) {
-        binding.wifiInclude.wifiStatusText.text = getString(R.string.wifi_pin_title)
-        binding.wifiInclude.wifiStatusText.setTextColor(getColor(R.color.accent_amber))
+    private fun showPinDialog(request: ConnectOutcome.NeedsPin, row: ItemDeviceBinding?) {
+        setSheetStatus(getString(R.string.pin_title))
         val input = EditText(this).apply {
-            hint = getString(R.string.wifi_pin_hint)
+            hint = getString(R.string.pin_hint)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or
-                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
             filters = arrayOf(InputFilter.LengthFilter(6), InputFilter.AllCaps())
-            textSize = 22f
-            setPadding(48, 32, 48, 32)
+            textSize = 28f
+            letterSpacing = 0.3f
+            gravity = Gravity.CENTER
+            setTextColor(getColor(R.color.text_primary))
+            setHintTextColor(getColor(R.color.text_faint))
+            background = getDrawable(R.drawable.bg_input_field)
+            minHeight = dp(64)
         }
-        val message = buildString {
-            request.error?.let { append(it).append("\n\n") }
-            append(getString(R.string.wifi_pin_message, request.tv.name))
+        val container = FrameLayout(this).apply {
+            setPadding(dp(24), dp(8), dp(24), 0)
+            addView(input, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.wifi_pin_title)
+        val message = listOfNotNull(request.error, getString(R.string.pin_message)).joinToString("\n\n")
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.pin_title)
             .setMessage(message)
-            .setView(input)
+            .setView(container)
             .setCancelable(false)
-            .setPositiveButton(R.string.wifi_pin_pair) { _, _ ->
+            .setPositiveButton(R.string.pin_pair) { _, _ ->
                 val pin = input.text?.toString().orEmpty()
-                binding.wifiInclude.wifiStatusText.text = getString(R.string.wifi_pairing)
+                setRowBusy(row, true)
+                setSheetStatus(getString(R.string.pairing))
                 netExecutor.execute {
                     val outcome = request.submit(pin)
-                    mainHandler.post { handleOutcome(outcome) }
+                    mainHandler.post { handleOutcome(outcome, row) }
                 }
             }
-            .setNegativeButton(android.R.string.cancel) { _, _ ->
+            .setNegativeButton(R.string.cancel) { _, _ ->
                 netExecutor.execute { request.cancel() }
-                refreshStatusBanner()
+                connecting = null
+                updateHeader()
+                setSheetStatus(null)
             }
             .show()
+        input.requestFocus()
+        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
     }
 
     // ------------------------------------------------------------ Bluetooth
 
-    private fun setupBluetoothPanel() {
-        val panel = binding.bluetoothInclude
-        bluetooth.listener = object : BluetoothHidRemote.Listener {
-            override fun onBluetoothState(message: String, connected: Boolean) {
-                mainHandler.post {
-                    setBluetoothStatus(message, connected)
-                    refreshStatusBanner()
-                }
-            }
-        }
-        panel.btnBtDiscoverable.setOnClickListener {
-            ButtonHaptics.click(it)
-            if (!prepareBluetooth()) return@setOnClickListener
-            try {
-                startActivity(
-                    Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
-                        .putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 180)
-                )
-            } catch (error: Exception) {
-                Toast.makeText(this, error.message ?: "Bluetooth unavailable", Toast.LENGTH_LONG).show()
-            }
-        }
-        panel.btnBtRefresh.setOnClickListener {
-            ButtonHaptics.click(it)
-            if (prepareBluetooth()) refreshBluetoothDevices()
-        }
-    }
-
-    /** Checks support, permission and adapter state; starts the HID service when possible. */
     private fun prepareBluetooth(): Boolean {
         if (!bluetooth.isSupported) {
-            setBluetoothStatus(getString(R.string.bt_unsupported), connected = false)
+            setSheetStatus(getString(R.string.bt_unsupported), error = true)
+            sheetBinding?.btnBtVisible?.isEnabled = false
             return false
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -433,96 +517,129 @@ class MainActivity : AppCompatActivity() {
             }
         }
         if (!bluetooth.isEnabled) {
-            setBluetoothStatus(getString(R.string.bt_turn_on), connected = false)
+            setSheetStatus(getString(R.string.bt_turn_on), error = true)
             runCatching { startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)) }
             return false
         }
         bluetooth.start()
-        if (binding.bluetoothInclude.btDeviceList.childCount == 0) refreshBluetoothDevices()
         return true
     }
 
-    private fun refreshBluetoothDevices() {
-        val list = binding.bluetoothInclude.btDeviceList
-        list.removeAllViews()
+    private fun renderBluetoothDevices() {
+        val sb = sheetBinding ?: return
+        sb.btDeviceList.removeAllViews()
         val devices = bluetooth.bondedDevices()
-        if (devices.isEmpty()) {
-            setBluetoothStatus(getString(R.string.bt_none_paired), connected = bluetooth.isReady)
+        sb.btEmpty.visibility = if (devices.isEmpty()) View.VISIBLE else View.GONE
+        devices.forEach { device -> addBluetoothRow(sb, device) }
+    }
+
+    private fun addBluetoothRow(sb: SheetConnectBinding, device: BluetoothDevice) {
+        val connectedHere = bluetooth.isReady && bluetooth.connectedName == bluetooth.deviceName(device)
+        addDeviceRow(
+            sb.btDeviceList,
+            bluetooth.deviceName(device),
+            getString(if (connectedHere) R.string.bt_connected else R.string.bt_paired),
+            R.drawable.ic_bluetooth
+        ) { row ->
+            setRowBusy(row, true)
+            btConnecting = true
+            connecting = bluetooth.deviceName(device)
+            prefs.edit().putString(PREF_BT, device.address).apply()
+            updateHeader()
+            bluetooth.connect(device)
+            mainHandler.postDelayed({ setRowBusy(row, false) }, 8000)
+        }
+    }
+
+    private fun makeBluetoothVisible() {
+        if (!prepareBluetooth()) return
+        setSheetStatus(getString(R.string.bt_ready))
+        runCatching {
+            startActivity(
+                Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
+                    .putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 180)
+            )
+        }
+    }
+
+    private fun onBluetoothState(message: String, connected: Boolean) {
+        if (connected) {
+            btConnecting = false
+            activate(ControlLink.BLUETOOTH)
+            sheet?.dismiss()
+            snack(message)
             return
         }
-        devices.forEach { device -> addBluetoothRow(device) }
-    }
-
-    private fun addBluetoothRow(device: BluetoothDevice) {
-        val button = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-            text = bluetooth.deviceName(device)
-            isAllCaps = false
-            setOnClickListener {
-                ButtonHaptics.click(it)
-                bluetooth.connect(device)
-            }
+        val stillConnecting = btConnecting && message.startsWith("Connecting")
+        if (!stillConnecting) {
+            if (activeLink == ControlLink.BLUETOOTH) activeLink = null
+            if (btConnecting) connecting = null
+            btConnecting = false
+            updateHeader()
         }
-        binding.bluetoothInclude.btDeviceList.addView(button)
+        setSheetStatus(message)
+        if (sheetBinding?.btSection?.visibility == View.VISIBLE) renderBluetoothDevices()
     }
 
-    private fun setBluetoothStatus(message: String, connected: Boolean) {
-        binding.bluetoothInclude.btStatusText.text = message
-        binding.bluetoothInclude.btStatusText.setTextColor(
-            getColor(if (connected) R.color.accent_teal else R.color.accent_amber)
-        )
-    }
+    // ------------------------------------------------------------ Infrared
 
-    private fun setupBrandSpinner() {
+    private fun setupIrSection(sb: SheetConnectBinding) {
+        if (!ir.hasBuiltInEmitter) {
+            sb.irText.text = getString(R.string.ir_missing)
+            sb.irBrandLabel.visibility = View.GONE
+            sb.irBrandGroup.visibility = View.GONE
+            sb.btnUseIr.visibility = View.GONE
+            return
+        }
         val brands = resources.getStringArray(R.array.tv_brands)
-        binding.brandSpinner.adapter = ArrayAdapter(
-            this,
-            R.layout.spinner_item,
-            brands
-        ).also { it.setDropDownViewResource(R.layout.spinner_dropdown_item) }
-        binding.brandSpinner.setSelection(0)
-        selectedBrand = TvBrand.HAIER
-        binding.brandSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                selectedBrand = TvBrand.fromDisplayName(brands[position])
+        brands.forEach { name ->
+            val brand = TvBrand.fromDisplayName(name)
+            val chip = Chip(this).apply {
+                text = name
+                isCheckable = true
+                isChecked = brand == selectedBrand
+                id = View.generateViewId()
+                tag = brand
+                chipBackgroundColor = getColorStateList(R.color.tab_bg_chip)
+                setTextColor(getColorStateList(R.color.tab_fg))
+                chipStrokeWidth = 0f
+                isCheckedIconVisible = false
             }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            sb.irBrandGroup.addView(chip)
+        }
+        sb.btnUseIr.setOnClickListener {
+            ButtonHaptics.click(it)
+            val chip = sb.irBrandGroup.findViewById<Chip>(sb.irBrandGroup.checkedChipId)
+            selectedBrand = (chip?.tag as? TvBrand) ?: selectedBrand
+            prefs.edit().putString(PREF_BRAND, selectedBrand.name).apply()
+            if (activeLink == ControlLink.WIFI) netExecutor.execute { wifi.disconnect() }
+            activate(ControlLink.IR)
+            sheet?.dismiss()
         }
     }
 
-    private fun setupModeToggle() {
-        binding.modeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (!isChecked) return@addOnButtonCheckedListener
-            when (checkedId) {
-                R.id.modeMouse -> showMode(Mode.MOUSE)
-                R.id.modeKeyboard -> showMode(Mode.KEYBOARD)
-                R.id.modeClassic -> showMode(Mode.CLASSIC)
-            }
+    // ------------------------------------------------------------ pages
+
+    private fun setupPages() {
+        binding.pageTabs.addOnButtonCheckedListener { _, id, checked ->
+            if (!checked) return@addOnButtonCheckedListener
+            ButtonHaptics.vibrate(this)
+            binding.pageRemote.visibility = if (id == R.id.tabRemote) View.VISIBLE else View.GONE
+            binding.pageTouchpad.visibility = if (id == R.id.tabTouchpad) View.VISIBLE else View.GONE
+            binding.pageKeyboard.visibility = if (id == R.id.tabKeyboard) View.VISIBLE else View.GONE
+            binding.pageNumbers.visibility = if (id == R.id.tabNumbers) View.VISIBLE else View.GONE
+            if (id == R.id.tabKeyboard) updateKeyboardMode()
         }
     }
 
-    private fun showMode(mode: Mode) {
-        binding.touchpadInclude.root.visibility = if (mode == Mode.MOUSE) View.VISIBLE else View.GONE
-        binding.keyboardInclude.root.visibility = if (mode == Mode.KEYBOARD) View.VISIBLE else View.GONE
-        binding.classicPanel.visibility = if (mode == Mode.CLASSIC) View.VISIBLE else View.GONE
-    }
-
-    private fun bindCoreButtons() {
+    private fun bindRemoteKeys() {
         listOf(
             binding.btnPower to RemoteCommand.POWER,
             binding.btnMute to RemoteCommand.MUTE,
-            binding.btnInput to RemoteCommand.INPUT,
             binding.btnVolUp to RemoteCommand.VOL_UP,
             binding.btnVolDown to RemoteCommand.VOL_DOWN,
             binding.btnChUp to RemoteCommand.CH_UP,
-            binding.btnChDown to RemoteCommand.CH_DOWN
-        ).forEach { (button, command) ->
-            button.setOnClickListener { sendSingle(it, command) }
-        }
-    }
-
-    private fun bindClassicButtons() {
-        listOf(
+            binding.btnChDown to RemoteCommand.CH_DOWN,
             binding.btnUp to RemoteCommand.UP,
             binding.btnDown to RemoteCommand.DOWN,
             binding.btnLeft to RemoteCommand.LEFT,
@@ -531,6 +648,11 @@ class MainActivity : AppCompatActivity() {
             binding.btnHome to RemoteCommand.HOME,
             binding.btnBack to RemoteCommand.BACK,
             binding.btnMenu to RemoteCommand.MENU,
+            binding.btnPadOk to RemoteCommand.OK,
+            binding.btnPadBack to RemoteCommand.BACK,
+            binding.btnPadHome to RemoteCommand.HOME,
+            binding.btnNumBack to RemoteCommand.BACK,
+            binding.btnNumOk to RemoteCommand.OK,
             binding.btn0 to RemoteCommand.DIGIT_0,
             binding.btn1 to RemoteCommand.DIGIT_1,
             binding.btn2 to RemoteCommand.DIGIT_2,
@@ -541,154 +663,78 @@ class MainActivity : AppCompatActivity() {
             binding.btn7 to RemoteCommand.DIGIT_7,
             binding.btn8 to RemoteCommand.DIGIT_8,
             binding.btn9 to RemoteCommand.DIGIT_9
-        ).forEach { (button, command) ->
-            button.setOnClickListener { sendSingle(it, command) }
+        ).forEach { (view, command) ->
+            view.setOnClickListener { sendSingle(it, command) }
         }
-    }
-
-    private fun setupTouchpad() {
-        val pad = binding.touchpadInclude
-        pad.touchpadView.listener = object : TouchpadView.Listener {
-            override fun onIrCommands(commands: List<RemoteCommand>) {
-                if (commands.isNotEmpty()) ButtonHaptics.vibrate(this@MainActivity)
-                sendSequence(commands, announce = false)
-            }
-
-            override fun onStatus(message: String) {
-                binding.lastCommandText.text = message
-                binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
-            }
-
-            override fun onPointerDelta(dx: Float, dy: Float): Boolean {
-                if (router.link != ControlLink.BLUETOOTH || !bluetooth.isReady) return false
-                bluetooth.moveMouse((dx * MOUSE_GAIN).roundToInt(), (dy * MOUSE_GAIN).roundToInt())
-                return true
-            }
-
-            override fun onTap(): Boolean {
-                if (router.link != ControlLink.BLUETOOTH || !bluetooth.isReady) return false
-                ButtonHaptics.vibrate(this@MainActivity)
-                bluetooth.click()
-                binding.lastCommandText.text = getString(R.string.last_command, "Click (Bluetooth)")
-                return true
-            }
-        }
-        pad.btnPadOk.setOnClickListener { sendSingle(it, RemoteCommand.OK) }
-        pad.btnPadBack.setOnClickListener { sendSingle(it, RemoteCommand.BACK) }
-        pad.btnPadHome.setOnClickListener { sendSingle(it, RemoteCommand.HOME) }
-    }
-
-    private fun setupKeyboard() {
-        val kb = binding.keyboardInclude
-        kb.btnResetKeyboardCursor.setOnClickListener {
+        binding.btnInput.setOnClickListener {
             ButtonHaptics.click(it)
-            keyboardNavigator.resetCursor()
-            updateKeyboardCursorLabel()
-            Toast.makeText(this, R.string.reset_tv_keyboard_cursor, Toast.LENGTH_SHORT).show()
+            onInputPressed()
         }
-        updateKeyboardCursorLabel()
-        buildKeyboardGrid(kb.keyboardGrid)
     }
 
-    private fun buildKeyboardGrid(grid: GridLayout) {
-        grid.removeAllViews()
-        TvKeyboardNavigator.DEFAULT_LAYOUT.forEach { row ->
-            row.forEach { ch ->
-                val label = when (ch) {
-                    ' ' -> "SPC"
-                    '↵' -> "ENT"
-                    else -> ch.uppercaseChar().toString()
-                }
-                val button = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
-                    text = label
-                    textSize = 12f
-                    minimumHeight = 0
-                    minHeight = 0
-                    insetTop = 0
-                    insetBottom = 0
-                    setPadding(4, 8, 4, 8)
-                    layoutParams = GridLayout.LayoutParams().apply {
-                        width = 0
-                        height = ViewGroup.LayoutParams.WRAP_CONTENT
-                        columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
-                        setMargins(2, 2, 2, 2)
-                    }
-                    setOnClickListener {
-                        ButtonHaptics.click(it)
-                        onSoftKey(ch)
-                    }
-                }
-                grid.addView(button)
-            }
+    private fun onInputPressed() {
+        if (!requireConnection()) return
+        val sources = router.inputSources()
+        when {
+            sources.isEmpty() -> snack(getString(R.string.input_unavailable))
+            sources.size == 1 -> sendInput(sources.first())
+            else -> showInputSheet(sources)
         }
-        addExtraKey(grid, "⌫") { onSoftKey('\b') }
-        addExtraKey(grid, "OK") { sendSingle(RemoteCommand.OK) }
-        addExtraKey(grid, "Back") { sendSingle(RemoteCommand.BACK) }
     }
 
-    private fun addExtraKey(grid: GridLayout, label: String, onClick: () -> Unit) {
-        val button = MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle).apply {
-            text = label
-            textSize = 12f
-            layoutParams = GridLayout.LayoutParams().apply {
-                width = 0
-                height = ViewGroup.LayoutParams.WRAP_CONTENT
-                columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 2f)
-                setMargins(2, 2, 2, 2)
-            }
-            setOnClickListener {
-                ButtonHaptics.click(it)
-                onClick()
-            }
+    private fun showInputSheet(sources: List<InputSource>) {
+        val dialog = BottomSheetDialog(this)
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(12), dp(22), dp(28))
         }
-        grid.addView(button)
+        content.addView(View(this).apply {
+            background = getDrawable(R.drawable.bg_sheet_handle)
+            layoutParams = LinearLayout.LayoutParams(dp(40), dp(5)).apply { gravity = Gravity.CENTER_HORIZONTAL }
+        })
+        content.addView(TextView(this).apply {
+            text = getString(R.string.input_title)
+            textSize = 22f
+            setTextColor(getColor(R.color.text_primary))
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            setPadding(0, dp(18), 0, dp(4))
+        })
+        sources.forEach { source ->
+            val icon = when (source) {
+                InputSource.INPUT_MENU -> R.drawable.ic_input
+                InputSource.TV -> R.drawable.ic_tv
+                InputSource.SETTINGS -> R.drawable.ic_menu
+                else -> R.drawable.ic_settings_input
+            }
+            addDeviceRow(content, source.label, "", icon) {
+                dialog.dismiss()
+                sendInput(source)
+            }.deviceSubtitle.visibility = View.GONE
+        }
+        dialog.setContentView(content)
+        dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        dialog.show()
     }
 
-    private fun onSoftKey(ch: Char) {
-        if (!ensureTransport()) return
-        if (router.supportsText()) {
-            val text = when (ch) {
-                '↵' -> "\n"
-                else -> ch.toString()
-            }
-            ioExecutor.execute {
-                val result = router.sendText(text)
-                mainHandler.post {
-                    if (result is TransmitResult.Failed) {
-                        binding.lastCommandText.text = result.reason
-                        binding.lastCommandText.setTextColor(Color.parseColor("#F87171"))
-                    } else {
-                        val shown = when (ch) {
-                            '\b' -> "⌫"
-                            '↵' -> "Enter"
-                            ' ' -> "Space"
-                            else -> ch.toString()
-                        }
-                        binding.lastCommandText.text = "${getString(R.string.typing_direct)} → $shown"
-                        binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
-                    }
-                }
-            }
-            return
+    private fun sendInput(source: InputSource) {
+        ioExecutor.execute {
+            val result = router.selectInput(selectedBrand, source)
+            mainHandler.post { onResult(result) }
         }
-        if (runner.isBusy()) {
-            Toast.makeText(this, R.string.typing_busy, Toast.LENGTH_SHORT).show()
-            return
-        }
-        val commands = keyboardNavigator.typeCharacter(ch)
-        if (commands.isEmpty()) return
-        sendSequence(commands) { updateKeyboardCursorLabel() }
-        binding.lastCommandText.text = "Keyboard → '$ch' (${commands.size} steps)"
-        binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
     }
 
-    private fun updateKeyboardCursorLabel() {
-        binding.keyboardInclude.keyboardCursorText.text = getString(
-            R.string.keyboard_cursor_fmt,
-            keyboardNavigator.row + 1,
-            keyboardNavigator.col + 1,
-            keyboardNavigator.currentChar().toString()
-        )
+    private fun requireConnection(): Boolean {
+        if (isConnected()) return true
+        if (connecting != null) {
+            snack(getString(R.string.status_connecting))
+            return false
+        }
+        if (activeLink != null) {
+            activeLink = null
+            updateHeader()
+        }
+        snack(getString(R.string.need_connection), getString(R.string.connect)) { openConnectSheet() }
+        return false
     }
 
     private fun sendSingle(view: View?, command: RemoteCommand) {
@@ -697,107 +743,207 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sendSingle(command: RemoteCommand) {
-        if (!ensureTransport()) return
+        if (!requireConnection()) return
         ioExecutor.execute {
             val result = router.send(selectedBrand, command)
-            mainHandler.post { showResult(command, result) }
+            mainHandler.post { onResult(result) }
         }
     }
 
-    private fun showResult(command: RemoteCommand, result: TransmitResult) {
-        when (result) {
-            is TransmitResult.Sent -> {
-                val via = when (router.link) {
-                    ControlLink.IR -> "IR"
-                    ControlLink.WIFI -> wifi.connectedTv?.protocol?.displayName ?: "Wi‑Fi"
-                    ControlLink.BLUETOOTH -> "Bluetooth"
-                }
-                binding.lastCommandText.text =
-                    getString(R.string.last_command, "${command.label} ($via)")
-                binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
-            }
-            is TransmitResult.Failed -> {
-                binding.lastCommandText.text = result.reason
-                binding.lastCommandText.setTextColor(Color.parseColor("#F87171"))
-                Toast.makeText(this, result.reason, Toast.LENGTH_LONG).show()
-            }
+    private fun onResult(result: TransmitResult) {
+        if (result is TransmitResult.Failed) {
+            updateHeader()
+            snack(result.reason)
         }
     }
 
-    private fun sendSequence(commands: List<RemoteCommand>, announce: Boolean = true, onDone: (() -> Unit)? = null) {
-        if (!ensureTransport()) return
-        if (commands.isEmpty()) {
+    private fun sendSequence(commands: List<RemoteCommand>, onDone: (() -> Unit)? = null) {
+        if (commands.isEmpty() || !requireConnection()) {
             onDone?.invoke()
             return
         }
-        if (announce) {
-            binding.lastCommandText.text =
-                "Sending ${commands.size} step(s): ${commands.joinToString(" → ") { it.label }}"
-            binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
-        }
-        // Run network/IR off main for Wi‑Fi; runner already spaces calls
         ioExecutor.execute {
-            val gap = 120L
             for ((index, command) in commands.withIndex()) {
                 val result = router.send(selectedBrand, command)
-                mainHandler.post {
-                    if (result is TransmitResult.Failed) {
-                        Toast.makeText(this, result.reason, Toast.LENGTH_LONG).show()
-                    } else if (!announce) {
-                        binding.lastCommandText.text = "→ ${command.label}"
-                        binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
-                    }
-                }
                 if (result is TransmitResult.Failed) {
-                    mainHandler.post { onDone?.invoke() }
+                    mainHandler.post { onResult(result); onDone?.invoke() }
                     return@execute
                 }
-                if (index < commands.lastIndex) Thread.sleep(gap)
+                if (index < commands.lastIndex) Thread.sleep(120)
             }
             mainHandler.post { onDone?.invoke() }
         }
     }
 
-    private fun ensureTransport(): Boolean {
-        if (router.statusReady()) return true
-        return when (router.link) {
-            ControlLink.IR -> {
-                if (!warnedMissingIr) showMissingIrDialog() else {
-                    Toast.makeText(this, R.string.status_need_ir_phone, Toast.LENGTH_LONG).show()
-                }
-                false
+    // ------------------------------------------------------------ touchpad
+
+    private fun setupTouchpad() {
+        binding.touchpadView.listener = object : TouchpadView.Listener {
+            override fun onIrCommands(commands: List<RemoteCommand>) {
+                if (commands.isNotEmpty()) ButtonHaptics.vibrate(this@MainActivity)
+                sendSequence(commands)
             }
-            ControlLink.WIFI -> {
-                Toast.makeText(this, R.string.need_wifi_connect, Toast.LENGTH_LONG).show()
-                false
+
+            override fun onStatus(message: String) = Unit
+
+            override fun onPointerDelta(dx: Float, dy: Float): Boolean {
+                if (activeLink != ControlLink.BLUETOOTH || !bluetooth.isReady) return false
+                bluetooth.moveMouse((dx * MOUSE_GAIN).roundToInt(), (dy * MOUSE_GAIN).roundToInt())
+                return true
             }
-            ControlLink.BLUETOOTH -> {
-                Toast.makeText(
-                    this,
-                    if (bluetooth.isSupported) R.string.need_bt_connect else R.string.bt_unsupported,
-                    Toast.LENGTH_LONG
-                ).show()
-                false
+
+            override fun onTap(): Boolean {
+                if (activeLink != ControlLink.BLUETOOTH || !bluetooth.isReady) return false
+                ButtonHaptics.vibrate(this@MainActivity)
+                bluetooth.click()
+                return true
             }
         }
     }
 
-    private fun showMissingIrDialog() {
-        warnedMissingIr = true
-        AlertDialog.Builder(this)
-            .setTitle(R.string.no_ir_title)
-            .setMessage(
-                getString(R.string.no_ir_message) +
-                    "\n\nOr switch to Wi‑Fi or Bluetooth mode to control your TV without IR."
-            )
-            .setPositiveButton(android.R.string.ok, null)
-            .setNeutralButton(R.string.link_wifi) { _, _ ->
-                binding.linkToggle.check(R.id.linkWifi)
+    // ------------------------------------------------------------ keyboard
+
+    private fun setupKeyboard() {
+        binding.typeField.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: Editable?) {
+                if (suppressTypeWatcher) return
+                val now = s?.toString().orEmpty()
+                val diff = typingDiff(lastTyped, now)
+                lastTyped = now
+                if (diff.isNotEmpty()) sendTextToTv(diff)
             }
-            .show()
+        })
+        binding.typeField.setOnEditorActionListener { _, actionId, event ->
+            val enter = actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE ||
+                actionId == EditorInfo.IME_ACTION_GO || event?.keyCode == KeyEvent.KEYCODE_ENTER
+            if (enter) {
+                sendTextToTv(listOf("\n"))
+                clearTypeField()
+            }
+            enter
+        }
+        binding.btnKbDelete.setOnClickListener {
+            ButtonHaptics.click(it)
+            val text = binding.typeField.text?.toString().orEmpty()
+            if (text.isNotEmpty()) {
+                binding.typeField.setText(text.dropLast(1))
+                binding.typeField.setSelection(binding.typeField.length())
+            } else {
+                sendTextToTv(listOf("\b"))
+            }
+        }
+        binding.btnKbEnter.setOnClickListener {
+            ButtonHaptics.click(it)
+            sendTextToTv(listOf("\n"))
+            clearTypeField()
+        }
+        binding.btnResetKeyboardCursor.setOnClickListener {
+            ButtonHaptics.click(it)
+            keyboardNavigator.resetCursor()
+        }
+        buildKeyboardGrid(binding.keyboardGrid)
+        updateKeyboardMode()
     }
 
+    private fun clearTypeField() {
+        suppressTypeWatcher = true
+        binding.typeField.setText("")
+        suppressTypeWatcher = false
+        lastTyped = ""
+    }
+
+    private fun updateKeyboardMode() {
+        // Direct typing is the default; the arrow-key keyboard is only for links that can't type
+        val direct = when (activeLink) {
+            null -> true
+            ControlLink.IR -> false
+            else -> router.supportsText()
+        }
+        binding.directTyping.visibility = if (direct) View.VISIBLE else View.GONE
+        binding.gridTyping.visibility = if (direct) View.GONE else View.VISIBLE
+        binding.keyboardHint.text = getString(if (direct) R.string.keyboard_direct_hint else R.string.keyboard_grid_hint)
+    }
+
+    private fun sendTextToTv(chunks: List<String>) {
+        if (!requireConnection()) return
+        if (!router.supportsText()) {
+            chunks.joinToString("").forEach { onGridKey(it) }
+            return
+        }
+        ioExecutor.execute {
+            for (chunk in chunks) {
+                val result = router.sendText(chunk)
+                if (result is TransmitResult.Failed) {
+                    mainHandler.post { onResult(result) }
+                    return@execute
+                }
+            }
+        }
+    }
+
+    private fun buildKeyboardGrid(grid: GridLayout) {
+        grid.removeAllViews()
+        TvKeyboardNavigator.DEFAULT_LAYOUT.forEach { row ->
+            row.forEach { ch ->
+                val label = when (ch) {
+                    ' ' -> "␣"
+                    '↵' -> "↵"
+                    else -> ch.uppercaseChar().toString()
+                }
+                grid.addView(gridKey(label, 1f) { onGridKey(ch) })
+            }
+        }
+        grid.addView(gridKey("⌫", 2f) { onGridKey('\b') })
+        grid.addView(gridKey(getString(R.string.ok), 2f) { sendSingle(RemoteCommand.OK) })
+        grid.addView(gridKey(getString(R.string.back), 2f) { sendSingle(RemoteCommand.BACK) })
+    }
+
+    private fun gridKey(label: String, weight: Float, onClick: () -> Unit): MaterialButton =
+        MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle).apply {
+            text = label
+            textSize = 15f
+            isAllCaps = false
+            minimumHeight = 0
+            minHeight = dp(48)
+            minWidth = 0
+            minimumWidth = 0
+            insetTop = 0
+            insetBottom = 0
+            setPadding(0, 0, 0, 0)
+            cornerRadius = dp(12)
+            backgroundTintList = getColorStateList(R.color.surface_high)
+            setTextColor(getColor(R.color.text_primary))
+            stateListAnimator = null
+            layoutParams = GridLayout.LayoutParams().apply {
+                width = 0
+                height = dp(48)
+                columnSpec = GridLayout.spec(GridLayout.UNDEFINED, weight.toInt(), weight)
+                setMargins(dp(2), dp(3), dp(2), dp(3))
+            }
+            setOnClickListener {
+                ButtonHaptics.click(it)
+                onClick()
+            }
+        }
+
+    private fun onGridKey(ch: Char) {
+        if (!requireConnection()) return
+        if (gridTypingBusy) {
+            snack(getString(R.string.typing_busy))
+            return
+        }
+        val commands = keyboardNavigator.typeCharacter(if (ch == '\n') '↵' else ch)
+        if (commands.isEmpty()) return
+        gridTypingBusy = true
+        sendSequence(commands) { gridTypingBusy = false }
+    }
+
+    // ------------------------------------------------------------ hardware keys / mouse
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (currentFocus is EditText) return super.dispatchKeyEvent(event)
         if (event.action != KeyEvent.ACTION_DOWN || event.repeatCount > 0) {
             return super.dispatchKeyEvent(event)
         }
@@ -806,52 +952,30 @@ class MainActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_DPAD_DOWN -> RemoteCommand.DOWN
             KeyEvent.KEYCODE_DPAD_LEFT -> RemoteCommand.LEFT
             KeyEvent.KEYCODE_DPAD_RIGHT -> RemoteCommand.RIGHT
-            KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_NUMPAD_ENTER ->
-                RemoteCommand.OK
-            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_DEL ->
-                RemoteCommand.BACK
-            KeyEvent.KEYCODE_HOME -> RemoteCommand.HOME
-            KeyEvent.KEYCODE_VOLUME_UP -> RemoteCommand.VOL_UP
-            KeyEvent.KEYCODE_VOLUME_DOWN -> RemoteCommand.VOL_DOWN
-            KeyEvent.KEYCODE_0, KeyEvent.KEYCODE_NUMPAD_0 -> RemoteCommand.DIGIT_0
-            KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_NUMPAD_1 -> RemoteCommand.DIGIT_1
-            KeyEvent.KEYCODE_2, KeyEvent.KEYCODE_NUMPAD_2 -> RemoteCommand.DIGIT_2
-            KeyEvent.KEYCODE_3, KeyEvent.KEYCODE_NUMPAD_3 -> RemoteCommand.DIGIT_3
-            KeyEvent.KEYCODE_4, KeyEvent.KEYCODE_NUMPAD_4 -> RemoteCommand.DIGIT_4
-            KeyEvent.KEYCODE_5, KeyEvent.KEYCODE_NUMPAD_5 -> RemoteCommand.DIGIT_5
-            KeyEvent.KEYCODE_6, KeyEvent.KEYCODE_NUMPAD_6 -> RemoteCommand.DIGIT_6
-            KeyEvent.KEYCODE_7, KeyEvent.KEYCODE_NUMPAD_7 -> RemoteCommand.DIGIT_7
-            KeyEvent.KEYCODE_8, KeyEvent.KEYCODE_NUMPAD_8 -> RemoteCommand.DIGIT_8
-            KeyEvent.KEYCODE_9, KeyEvent.KEYCODE_NUMPAD_9 -> RemoteCommand.DIGIT_9
-            else -> {
-                val ch = event.unicodeChar.toChar()
-                if (ch.isLetter() || ch == ' ' || ch == '.') {
-                    onSoftKey(ch.lowercaseChar())
-                    return true
-                }
-                null
-            }
+            KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> RemoteCommand.OK
+            KeyEvent.KEYCODE_ESCAPE -> RemoteCommand.BACK
+            KeyEvent.KEYCODE_VOLUME_UP -> if (isConnected()) RemoteCommand.VOL_UP else null
+            KeyEvent.KEYCODE_VOLUME_DOWN -> if (isConnected()) RemoteCommand.VOL_DOWN else null
+            else -> null
         }
         if (command != null) {
-            sendSingle(command)
+            sendSingle(null, command)
             return true
         }
         return super.dispatchKeyEvent(event)
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
-        if (event.source and InputDevice.SOURCE_CLASS_POINTER == 0) {
+        if (event.source and InputDevice.SOURCE_CLASS_POINTER == 0 || !isConnected()) {
             return super.onGenericMotionEvent(event)
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_HOVER_MOVE, MotionEvent.ACTION_MOVE -> {
                 val relX = event.getAxisValue(MotionEvent.AXIS_RELATIVE_X)
                 val relY = event.getAxisValue(MotionEvent.AXIS_RELATIVE_Y)
-                val useX = if (relX != 0f) relX else event.getAxisValue(MotionEvent.AXIS_HSCROLL) * 40f
-                val useY = if (relY != 0f) relY else event.getAxisValue(MotionEvent.AXIS_VSCROLL) * 40f
-                val commands = hardwarePointer.onMove(useX, useY)
+                val commands = hardwarePointer.onMove(relX, relY)
                 if (commands.isNotEmpty()) {
-                    sendSequence(commands, announce = false)
+                    sendSequence(commands)
                     return true
                 }
             }
@@ -871,20 +995,64 @@ class MainActivity : AppCompatActivity() {
         return super.onGenericMotionEvent(event)
     }
 
+    // ------------------------------------------------------------ misc
+
+    private fun scheduleAutomationCommands(names: Array<String>) {
+        ioExecutor.execute {
+            var waits = 0
+            while (!wifi.isReady && waits < 100) {
+                Thread.sleep(150)
+                waits++
+            }
+            if (!wifi.isReady) return@execute
+            for (name in names) {
+                val command = runCatching { RemoteCommand.valueOf(name.trim().uppercase()) }.getOrNull() ?: continue
+                val result = router.send(selectedBrand, command)
+                mainHandler.post { onResult(result) }
+                Thread.sleep(250)
+            }
+        }
+    }
+
+    private fun snack(message: String, actionLabel: String? = null, action: (() -> Unit)? = null) {
+        val bar = Snackbar.make(binding.root, message, if (action != null) Snackbar.LENGTH_LONG else Snackbar.LENGTH_SHORT)
+            .setBackgroundTint(getColor(R.color.surface_high))
+            .setTextColor(getColor(R.color.text_primary))
+            .setActionTextColor(getColor(R.color.accent))
+        if (actionLabel != null && action != null) bar.setAction(actionLabel) { action() }
+        bar.show()
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
+
     override fun onDestroy() {
         promptDialog?.dismiss()
+        sheet?.dismiss()
         bluetooth.stop()
         ioExecutor.shutdownNow()
+        scanExecutor.shutdownNow()
         netExecutor.execute { wifi.disconnect() }
         netExecutor.shutdown()
         super.onDestroy()
     }
 
-    private enum class Mode { MOUSE, KEYBOARD, CLASSIC }
-
     companion object {
-        private const val MOUSE_GAIN = 1.4f
         const val EXTRA_WIFI_IP = "wifi_ip"
         const val EXTRA_SEND_COMMANDS = "send_commands"
+        private const val PREF_LINK = "link"
+        private const val PREF_BRAND = "ir_brand"
+        private const val PREF_BT = "bt_address"
+        private const val MOUSE_GAIN = 1.4f
+
+        /** Minimal edits that turn [old] into [new]: one "\b" per removed char, then the inserted text. */
+        fun typingDiff(old: String, new: String): List<String> {
+            var prefix = 0
+            while (prefix < old.length && prefix < new.length && old[prefix] == new[prefix]) prefix++
+            val result = ArrayList<String>()
+            repeat(old.length - prefix) { result += "\b" }
+            val inserted = new.substring(prefix)
+            if (inserted.isNotEmpty()) result += inserted
+            return result
+        }
     }
 }

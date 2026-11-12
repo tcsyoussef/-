@@ -41,21 +41,21 @@ class TouchpadView @JvmOverloads constructor(
     private var active = false
 
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF1E293B.toInt()
+        color = 0xFF171922.toInt()
         style = Paint.Style.FILL
     }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF334155.toInt()
+        color = 0xFF2C3040.toInt()
         style = Paint.Style.STROKE
-        strokeWidth = 3f
+        strokeWidth = 2f
     }
     private val guidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF64748B.toInt()
+        color = 0xFF5F6578.toInt()
         textAlign = Paint.Align.CENTER
         textSize = 36f
     }
     private val activePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0x332DD4BF
+        color = 0x267C6CFF
         style = Paint.Style.FILL
     }
     private val bounds = RectF()
@@ -65,15 +65,17 @@ class TouchpadView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        canvas.drawRoundRect(bounds, 28f, 28f, fillPaint)
-        canvas.drawRoundRect(bounds, 28f, 28f, strokePaint)
+        val r = 28f * resources.displayMetrics.density / 2f
+        canvas.drawRoundRect(bounds, r, r, fillPaint)
+        canvas.drawRoundRect(bounds, r, r, strokePaint)
         if (active) {
-            canvas.drawRoundRect(bounds, 28f, 28f, activePaint)
+            canvas.drawRoundRect(bounds, r, r, activePaint)
         }
-        canvas.drawText("TOUCHPAD", width / 2f, height / 2f - 12f, guidePaint)
-        guidePaint.textSize = 28f
-        canvas.drawText("swipe = move · tap = OK", width / 2f, height / 2f + 28f, guidePaint)
-        guidePaint.textSize = 36f
+        val d = resources.displayMetrics.density * resources.configuration.fontScale
+        guidePaint.textSize = 17f * d
+        canvas.drawText("Swipe to move", width / 2f, height / 2f - 6f * d, guidePaint)
+        guidePaint.textSize = 13f * d
+        canvas.drawText("Tap to select", width / 2f, height / 2f + 18f * d, guidePaint)
     }
 
     @SuppressLint("ClickableViewAccessibility")

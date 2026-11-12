@@ -1,441 +1,534 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_deep"
-    android:fillViewport="true">
+    android:background="@color/bg"
+    android:orientation="vertical">
 
+    <!-- Header: which TV + one Connect / Disconnect button -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="20dp">
-
-        <TextView
-            android:id="@+id/title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
-            android:letterSpacing="0.04"
-            android:text="@string/app_name"
-            android:textColor="@color/text_primary"
-            android:textSize="28sp" />
-
-        <TextView
-            android:id="@+id/statusText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textColor="@color/accent_teal"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/usbStatusText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/status_usb_ir_untested"
-            android:textColor="@color/accent_amber"
-            android:textSize="12sp" />
-
-        <com.google.android.material.button.MaterialButtonToggleGroup
-            android:id="@+id/linkToggle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            app:checkedButton="@+id/linkIr"
-            app:selectionRequired="true"
-            app:singleSelection="true">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/linkIr"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:text="@string/link_ir"
-                android:textAllCaps="false" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/linkWifi"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:text="@string/link_wifi"
-                android:textAllCaps="false" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/linkBluetooth"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:text="@string/link_bluetooth"
-                android:textAllCaps="false" />
-        </com.google.android.material.button.MaterialButtonToggleGroup>
-
-        <include
-            android:id="@+id/wifiInclude"
-            layout="@layout/panel_wifi"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" />
-
-        <include
-            android:id="@+id/bluetoothInclude"
-            layout="@layout/panel_bluetooth"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" />
-
-        <TextView
-            android:id="@+id/brandLabel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/brand_label"
-            android:textColor="@color/text_muted"
-            android:textSize="12sp" />
-
-        <Spinner
-            android:id="@+id/brandSpinner"
-            android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="4dp"
-            android:background="@drawable/bg_spinner"
-            android:paddingHorizontal="12dp" />
-
-        <TextView
-            android:id="@+id/lastCommandText"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/no_command_yet"
-            android:textColor="@color/text_muted"
-            android:textSize="13sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/disclaimer"
-            android:textColor="@color/text_muted"
-            android:textSize="11sp" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnPower"
-            style="@style/RemoteButton.Power"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="16dp"
-            android:text="@string/power" />
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="12dp">
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:id="@+id/statusArea"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnMute"
-                style="@style/RemoteButton"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1"
-                android:text="@string/mute" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnInput"
-                style="@style/RemoteButton"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:text="@string/input" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnVolDown"
-                style="@style/RemoteButton"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1"
-                android:text="@string/vol_down" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnVolUp"
-                style="@style/RemoteButton"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:text="@string/vol_up" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnChDown"
-                style="@style/RemoteButton"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1"
-                android:text="@string/ch_down" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnChUp"
-                style="@style/RemoteButton"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:text="@string/ch_up" />
-        </LinearLayout>
-
-        <com.google.android.material.button.MaterialButtonToggleGroup
-            android:id="@+id/modeToggle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:checkedButton="@+id/modeMouse"
-            app:selectionRequired="true"
-            app:singleSelection="true">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/modeMouse"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:text="@string/mode_mouse"
-                android:textAllCaps="false" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/modeKeyboard"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:text="@string/mode_keyboard"
-                android:textAllCaps="false" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/modeClassic"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:text="@string/mode_classic"
-                android:textAllCaps="false" />
-        </com.google.android.material.button.MaterialButtonToggleGroup>
-
-        <include
-            android:id="@+id/touchpadInclude"
-            layout="@layout/panel_touchpad"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp" />
-
-        <include
-            android:id="@+id/keyboardInclude"
-            layout="@layout/panel_keyboard"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp" />
-
-        <LinearLayout
-            android:id="@+id/classicPanel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
             android:orientation="vertical"
-            android:visibility="gone">
-
-            <GridLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:alignmentMode="alignBounds"
-                android:columnCount="3"
-                android:rowCount="3"
-                android:useDefaultMargins="true">
-
-                <Space
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_columnWeight="1" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnUp"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="@string/up" />
-
-                <Space
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_columnWeight="1" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnLeft"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="@string/left" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnOk"
-                    style="@style/RemoteButton.Accent"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="@string/ok" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnRight"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="@string/right" />
-
-                <Space
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_columnWeight="1" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnDown"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="@string/down" />
-
-                <Space
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_columnWeight="1" />
-            </GridLayout>
+            android:paddingVertical="4dp">
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnMenu"
-                    style="@style/RemoteButton"
-                    android:layout_marginEnd="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/menu" />
+                <ImageView
+                    android:id="@+id/statusDot"
+                    android:layout_width="9dp"
+                    android:layout_height="9dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/bg_status_dot"
+                    app:tint="@color/text_faint" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnHome"
-                    style="@style/RemoteButton"
-                    android:layout_marginHorizontal="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/home" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnBack"
-                    style="@style/RemoteButton"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/back" />
+                <TextView
+                    android:id="@+id/statusLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/status_not_connected"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
             </LinearLayout>
 
-            <GridLayout
-                android:id="@+id/numberPad"
+            <TextView
+                android:id="@+id/tvName"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:alignmentMode="alignBounds"
-                android:columnCount="3"
-                android:rowCount="4"
-                android:useDefaultMargins="true">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn1"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="1" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn2"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="2" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn3"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="3" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn4"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="4" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn5"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="5" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn6"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="6" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn7"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="7" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn8"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="8" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn9"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="9" />
-
-                <Space
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_columnWeight="1" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn0"
-                    style="@style/RemoteButton"
-                    android:layout_width="0dp"
-                    android:layout_columnWeight="1"
-                    android:text="0" />
-
-                <Space
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_columnWeight="1" />
-            </GridLayout>
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:text="@string/no_tv"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp" />
         </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnConnection"
+            style="@style/PrimaryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:paddingHorizontal="18dp"
+            android:text="@string/connect"
+            android:textSize="15sp"
+            app:cornerRadius="24dp"
+            app:icon="@drawable/ic_link"
+            app:iconSize="20dp" />
     </LinearLayout>
-</ScrollView>
+
+    <!-- Page tabs -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:background="@drawable/bg_tabs"
+        android:padding="4dp">
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/pageTabs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:checkedButton="@+id/tabRemote"
+            app:selectionRequired="true"
+            app:singleSelection="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tabRemote"
+                style="@style/TabButton"
+                android:text="@string/tab_remote"
+                app:icon="@drawable/ic_remote" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tabTouchpad"
+                style="@style/TabButton"
+                android:text="@string/tab_touchpad"
+                app:icon="@drawable/ic_mouse" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tabKeyboard"
+                style="@style/TabButton"
+                android:text="@string/tab_keyboard"
+                app:icon="@drawable/ic_keyboard" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tabNumbers"
+                style="@style/TabButton"
+                android:text="@string/tab_numbers"
+                app:icon="@drawable/ic_dialpad" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+    </FrameLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:overScrollMode="never">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="28dp">
+
+            <!-- ============ Remote page ============ -->
+            <LinearLayout
+                android:id="@+id/pageRemote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPower"
+                        style="@style/RoundKey.Power"
+                        android:contentDescription="@string/power"
+                        app:icon="@drawable/ic_power" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnInput"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/input"
+                        app:icon="@drawable/ic_input" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="264dp"
+                    android:layout_height="264dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_dpad">
+
+                    <ImageButton
+                        android:id="@+id/btnUp"
+                        style="@style/DpadArrow"
+                        android:layout_gravity="top|center_horizontal"
+                        android:contentDescription="@string/up"
+                        android:padding="20dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_up" />
+
+                    <ImageButton
+                        android:id="@+id/btnDown"
+                        style="@style/DpadArrow"
+                        android:layout_gravity="bottom|center_horizontal"
+                        android:contentDescription="@string/down"
+                        android:padding="20dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_down" />
+
+                    <ImageButton
+                        android:id="@+id/btnLeft"
+                        style="@style/DpadArrow"
+                        android:layout_gravity="start|center_vertical"
+                        android:contentDescription="@string/left"
+                        android:padding="20dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_left" />
+
+                    <ImageButton
+                        android:id="@+id/btnRight"
+                        style="@style/DpadArrow"
+                        android:layout_gravity="end|center_vertical"
+                        android:contentDescription="@string/right"
+                        android:padding="20dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_right" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnOk"
+                        style="@style/RoundKey.Accent"
+                        android:layout_width="104dp"
+                        android:layout_height="104dp"
+                        android:layout_gravity="center"
+                        android:fontFamily="sans-serif-medium"
+                        android:text="@string/ok"
+                        android:textColor="@color/on_accent"
+                        android:textSize="20sp"
+                        app:cornerRadius="52dp" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnBack"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/back"
+                        app:icon="@drawable/ic_back" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnHome"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/home"
+                        app:icon="@drawable/ic_home" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnMenu"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/menu"
+                        app:icon="@drawable/ic_menu" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="28dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="76dp"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_rocker"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingVertical="4dp">
+
+                        <ImageButton
+                            android:id="@+id/btnVolUp"
+                            style="@style/RockerButton"
+                            android:contentDescription="@string/vol_up"
+                            android:src="@drawable/ic_add" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingVertical="6dp"
+                            android:text="@string/vol"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp" />
+
+                        <ImageButton
+                            android:id="@+id/btnVolDown"
+                            style="@style/RockerButton"
+                            android:contentDescription="@string/vol_down"
+                            android:src="@drawable/ic_remove" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnMute"
+                            style="@style/RoundKey"
+                            android:contentDescription="@string/mute"
+                            app:icon="@drawable/ic_mute" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/mute"
+                            android:textColor="@color/text_faint"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="76dp"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_rocker"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingVertical="4dp">
+
+                        <ImageButton
+                            android:id="@+id/btnChUp"
+                            style="@style/RockerButton"
+                            android:contentDescription="@string/ch_up"
+                            android:src="@drawable/ic_up" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingVertical="6dp"
+                            android:text="@string/ch"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp" />
+
+                        <ImageButton
+                            android:id="@+id/btnChDown"
+                            style="@style/RockerButton"
+                            android:contentDescription="@string/ch_down"
+                            android:src="@drawable/ic_down" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ============ Touchpad page ============ -->
+            <LinearLayout
+                android:id="@+id/pageTouchpad"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <com.irremote.tv.input.TouchpadView
+                    android:id="@+id/touchpadView"
+                    android:layout_width="match_parent"
+                    android:layout_height="340dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPadBack"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/back"
+                        app:icon="@drawable/ic_back" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPadOk"
+                        style="@style/RoundKey.Accent"
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:text="@string/ok"
+                        android:textColor="@color/on_accent"
+                        android:textSize="18sp"
+                        app:cornerRadius="40dp" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPadHome"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/home"
+                        app:icon="@drawable/ic_home" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ============ Keyboard page ============ -->
+            <LinearLayout
+                android:id="@+id/pageKeyboard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/keyboardHint"
+                    style="@style/BodyText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/keyboard_direct_hint" />
+
+                <LinearLayout
+                    android:id="@+id/directTyping"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="vertical">
+
+                    <EditText
+                        android:id="@+id/typeField"
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:background="@drawable/bg_input_field"
+                        android:drawableStart="@drawable/ic_keyboard"
+                        android:drawablePadding="12dp"
+                        android:drawableTint="@color/text_faint"
+                        android:hint="@string/type_hint"
+                        android:imeOptions="actionSearch|flagNoExtractUi"
+                        android:importantForAutofill="no"
+                        android:inputType="textVisiblePassword|textNoSuggestions"
+                        android:paddingHorizontal="18dp"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_faint"
+                        android:textSize="18sp"
+                        tools:ignore="UnusedAttribute" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnKbDelete"
+                            style="@style/SecondaryButton"
+                            android:layout_width="0dp"
+                            android:layout_marginEnd="6dp"
+                            android:layout_weight="1"
+                            android:text="@string/delete"
+                            app:icon="@drawable/ic_backspace" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnKbEnter"
+                            style="@style/PrimaryButton"
+                            android:layout_width="0dp"
+                            android:layout_marginStart="6dp"
+                            android:layout_weight="1"
+                            android:text="@string/enter"
+                            app:icon="@drawable/ic_send" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/gridTyping"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnResetKeyboardCursor"
+                        style="@style/SecondaryButton"
+                        android:layout_width="match_parent"
+                        android:text="@string/reset_tv_keyboard_cursor"
+                        app:icon="@drawable/ic_refresh" />
+
+                    <GridLayout
+                        android:id="@+id/keyboardGrid"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:columnCount="10" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ============ Numbers page ============ -->
+            <GridLayout
+                android:id="@+id/pageNumbers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="3"
+                android:visibility="gone">
+
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn1" style="@style/NumKey" android:text="1" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn2" style="@style/NumKey" android:text="2" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn3" style="@style/NumKey" android:text="3" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn4" style="@style/NumKey" android:text="4" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn5" style="@style/NumKey" android:text="5" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn6" style="@style/NumKey" android:text="6" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn7" style="@style/NumKey" android:text="7" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn8" style="@style/NumKey" android:text="8" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn9" style="@style/NumKey" android:text="9" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnNumBack"
+                    style="@style/NumKey"
+                    android:contentDescription="@string/back"
+                    app:icon="@drawable/ic_back"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp"
+                    app:iconTint="@color/text_secondary" />
+
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn0" style="@style/NumKey" android:text="0" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnNumOk"
+                    style="@style/NumKey"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/ok"
+                    android:textColor="@color/on_accent"
+                    android:textSize="18sp"
+                    app:backgroundTint="@color/accent" />
+            </GridLayout>
+        </FrameLayout>
+    </ScrollView>
+</LinearLayout>
