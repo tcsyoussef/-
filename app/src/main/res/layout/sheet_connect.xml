@@ -41,12 +41,11 @@
             android:background="@drawable/bg_input_field"
             android:padding="4dp">
 
-            <com.google.android.material.button.MaterialButtonToggleGroup
+            <LinearLayout
                 android:id="@+id/sheetTabs"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:selectionRequired="true"
-                app:singleSelection="true">
+                android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/sheetTabWifi"
@@ -65,7 +64,7 @@
                     style="@style/TabButton"
                     android:text="@string/link_ir"
                     app:icon="@drawable/ic_ir" />
-            </com.google.android.material.button.MaterialButtonToggleGroup>
+            </LinearLayout>
         </FrameLayout>
 
         <TextView

@@ -72,6 +72,11 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // Robolectric installs Conscrypt JVM-wide; it needs reflective access on JDK 17+
+            it.jvmArgs("--add-opens=java.base/java.net=ALL-UNNAMED")
+        }
     }
 }
 

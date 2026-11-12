@@ -59,6 +59,7 @@ import com.irremote.tv.net.TvDiscovery
 import com.irremote.tv.net.WifiRemoteManager
 import com.irremote.tv.net.androidtv.ClientIdentity
 import com.irremote.tv.ui.ButtonHaptics
+import com.irremote.tv.ui.SegmentedTabs
 import com.irremote.tv.wifi.WifiTvScanner
 import java.io.File
 import java.util.concurrent.Executors
@@ -260,8 +261,8 @@ class MainActivity : AppCompatActivity() {
         sheet = dialog
         sheetBinding = sb
 
-        sb.sheetTabs.addOnButtonCheckedListener { _, id, checked ->
-            if (!checked) return@addOnButtonCheckedListener
+        val sheetTabs = SegmentedTabs(listOf(sb.sheetTabWifi, sb.sheetTabBt, sb.sheetTabIr)) { id ->
+            ButtonHaptics.vibrate(this)
             showSheetSection(
                 when (id) {
                     R.id.sheetTabBt -> ControlLink.BLUETOOTH
@@ -289,15 +290,14 @@ class MainActivity : AppCompatActivity() {
         val initial = tab ?: activeLink ?: runCatching {
             ControlLink.valueOf(prefs.getString(PREF_LINK, null) ?: "")
         }.getOrDefault(ControlLink.WIFI)
-        sb.sheetTabs.check(
+        dialog.show()
+        sheetTabs.check(
             when (initial) {
                 ControlLink.BLUETOOTH -> R.id.sheetTabBt
                 ControlLink.IR -> R.id.sheetTabIr
                 ControlLink.WIFI -> R.id.sheetTabWifi
             }
         )
-        showSheetSection(initial)
-        dialog.show()
     }
 
     private fun showSheetSection(link: ControlLink) {
@@ -621,15 +621,15 @@ class MainActivity : AppCompatActivity() {
     // ------------------------------------------------------------ pages
 
     private fun setupPages() {
-        binding.pageTabs.addOnButtonCheckedListener { _, id, checked ->
-            if (!checked) return@addOnButtonCheckedListener
+        val tabs = listOf(binding.tabRemote, binding.tabTouchpad, binding.tabKeyboard, binding.tabNumbers)
+        SegmentedTabs(tabs) { id ->
             ButtonHaptics.vibrate(this)
             binding.pageRemote.visibility = if (id == R.id.tabRemote) View.VISIBLE else View.GONE
             binding.pageTouchpad.visibility = if (id == R.id.tabTouchpad) View.VISIBLE else View.GONE
             binding.pageKeyboard.visibility = if (id == R.id.tabKeyboard) View.VISIBLE else View.GONE
             binding.pageNumbers.visibility = if (id == R.id.tabNumbers) View.VISIBLE else View.GONE
             if (id == R.id.tabKeyboard) updateKeyboardMode()
-        }
+        }.also { binding.tabRemote.isChecked = true }
     }
 
     private fun bindRemoteKeys() {

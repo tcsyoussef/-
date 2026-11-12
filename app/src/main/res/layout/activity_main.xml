@@ -87,13 +87,11 @@
         android:background="@drawable/bg_tabs"
         android:padding="4dp">
 
-        <com.google.android.material.button.MaterialButtonToggleGroup
+        <LinearLayout
             android:id="@+id/pageTabs"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:checkedButton="@+id/tabRemote"
-            app:selectionRequired="true"
-            app:singleSelection="true">
+            android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/tabRemote"
@@ -118,7 +116,7 @@
                 style="@style/TabButton"
                 android:text="@string/tab_numbers"
                 app:icon="@drawable/ic_dialpad" />
-        </com.google.android.material.button.MaterialButtonToggleGroup>
+        </LinearLayout>
     </FrameLayout>
 
     <ScrollView
