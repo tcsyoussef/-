@@ -27,6 +27,14 @@ class HaierWifiKeyCodesTest {
     }
 
     @Test
+    fun homeMenuInput_matchVestelHaierCodes() {
+        assertEquals(1048, HaierWifiKeyCodes.codeFor(RemoteCommand.HOME))
+        assertEquals(1066, HaierWifiKeyCodes.codeFor(RemoteCommand.MENU))
+        assertEquals(1056, HaierWifiKeyCodes.codeFor(RemoteCommand.INPUT))
+        assertEquals(1010, HaierWifiKeyCodes.codeFor(RemoteCommand.BACK))
+    }
+
+    @Test
     fun digits_use1000Base() {
         assertEquals(1000, HaierWifiKeyCodes.codeFor(RemoteCommand.DIGIT_0))
         assertEquals(1005, HaierWifiKeyCodes.codeFor(RemoteCommand.DIGIT_5))
@@ -38,5 +46,13 @@ class HaierWifiKeyCodesTest {
         val body = HaierWifiKeyCodes.requestBody(1012)
         assertTrue(body.contains("code='1012'"))
         assertTrue(body.contains("<remote>"))
+        assertTrue(body.startsWith("<?xml"))
+    }
+
+    @Test
+    fun requestBodies_includePrimaryVestelFormat() {
+        val bodies = HaierWifiKeyCodes.requestBodies(1048)
+        assertEquals("<?xml version='1.0' ?><remote><key code='1048'/></remote>", bodies.first())
+        assertTrue(bodies.size >= 2)
     }
 }

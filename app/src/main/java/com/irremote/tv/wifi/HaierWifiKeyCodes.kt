@@ -3,11 +3,12 @@ package com.irremote.tv.wifi
 import com.irremote.tv.ir.RemoteCommand
 
 /**
- * Haier / Vestel SmartCenter LAN key codes (HTTP POST :56789/apps/SmartCenter).
- * Documented from Haier V300S local API reverse engineering.
+ * Haier / Vestel SmartCenter LAN key codes.
+ * Aligned with working open-source Vestel/Toshiba/Haier LAN remotes
+ * (Home Assistant vestel_television, wget SmartCenter scripts).
  */
 object HaierWifiKeyCodes {
-    fun codeFor(command: RemoteCommand): Int? = when (command) {
+    fun codeFor(command: RemoteCommand): Int = when (command) {
         RemoteCommand.POWER -> 1012
         RemoteCommand.MUTE -> 1013
         RemoteCommand.VOL_UP -> 1016
@@ -20,8 +21,11 @@ object HaierWifiKeyCodes {
         RemoteCommand.RIGHT -> 1022
         RemoteCommand.OK -> 1053
         RemoteCommand.BACK -> 1010
-        RemoteCommand.MENU -> 1048
-        RemoteCommand.HOME -> 1037 // Exit / leave app — closest home-like key
+        // HOME was wrongly mapped to Exit(1037); Vestel/HA maps home -> 1048
+        RemoteCommand.HOME -> 1048
+        // MENU was wrongly mapped to 1048; Vestel/HA maps menu -> 1066
+        RemoteCommand.MENU -> 1066
+        // SOURCE / INPUT
         RemoteCommand.INPUT -> 1056
         RemoteCommand.DIGIT_0 -> 1000
         RemoteCommand.DIGIT_1 -> 1001
@@ -35,6 +39,14 @@ object HaierWifiKeyCodes {
         RemoteCommand.DIGIT_9 -> 1009
     }
 
+    /** Primary body used by working wget / Vestel remotes. */
     fun requestBody(keyCode: Int): String =
-        "<?xml version='1.0' ?><remote><key code='$keyCode'/><?xml version='1.0' ?>"
+        "<?xml version='1.0' ?><remote><key code='$keyCode'/></remote>"
+
+    /** Bodies used by real Vestel remotes (try in order). */
+    fun requestBodies(keyCode: Int): List<String> = listOf(
+        requestBody(keyCode),
+        "<remote><key code=$keyCode /></remote>",
+        "<remote><key code=\"$keyCode\"/></remote>"
+    )
 }

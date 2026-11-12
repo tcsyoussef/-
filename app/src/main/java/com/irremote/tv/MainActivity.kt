@@ -27,6 +27,7 @@ import com.irremote.tv.ir.AndroidIrTransmitter
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
 import com.irremote.tv.ir.TvBrand
+import com.irremote.tv.ui.ButtonHaptics
 import com.irremote.tv.wifi.HaierWifiClient
 import com.irremote.tv.wifi.WifiTvDevice
 import com.irremote.tv.wifi.WifiTvScanner
@@ -71,6 +72,37 @@ class MainActivity : AppCompatActivity() {
         if (!ir.hasBuiltInEmitter) {
             // Prefer Wi‑Fi when phone has no IR
             binding.linkToggle.check(R.id.linkWifi)
+        }
+
+        // Optional automation:
+        // adb shell am start -n com.irremote.tv/.MainActivity --es wifi_ip 10.0.2.2 --esa send_commands HOME,INPUT,MENU
+        intent.getStringExtra(EXTRA_WIFI_IP)?.trim()?.takeIf { it.isNotEmpty() }?.let { ip ->
+            binding.linkToggle.check(R.id.linkWifi)
+            binding.wifiInclude.wifiIpInput.setText(ip)
+            connectWifi(ip)
+            val pending = intent.getStringArrayExtra(EXTRA_SEND_COMMANDS)
+            if (!pending.isNullOrEmpty()) {
+                scheduleAutomationCommands(pending)
+            }
+        }
+    }
+
+    private fun scheduleAutomationCommands(names: Array<String>) {
+        ioExecutor.execute {
+            // Wait for Wi‑Fi connect to finish
+            var waits = 0
+            while (!wifiClient.isConnected && waits < 40) {
+                Thread.sleep(150)
+                waits++
+            }
+            if (!wifiClient.isConnected) return@execute
+            for (name in names) {
+                val command = runCatching { RemoteCommand.valueOf(name.trim().uppercase()) }.getOrNull()
+                    ?: continue
+                val result = router.send(selectedBrand, command)
+                mainHandler.post { showResult(command, result) }
+                Thread.sleep(250)
+            }
         }
     }
 
@@ -138,10 +170,14 @@ class MainActivity : AppCompatActivity() {
     private fun setupWifiPanel() {
         val wifi = binding.wifiInclude
         wifi.btnWifiConnect.setOnClickListener {
+            ButtonHaptics.click(it)
             val ip = wifi.wifiIpInput.text?.toString().orEmpty()
             connectWifi(ip)
         }
-        wifi.btnWifiScan.setOnClickListener { scanWifi() }
+        wifi.btnWifiScan.setOnClickListener {
+            ButtonHaptics.click(it)
+            scanWifi()
+        }
     }
 
     private fun scanWifi() {
@@ -173,6 +209,7 @@ class MainActivity : AppCompatActivity() {
             text = device.displayLabel
             isAllCaps = false
             setOnClickListener {
+                ButtonHaptics.click(it)
                 binding.wifiInclude.wifiIpInput.setText(device.ip)
                 connectWifi(device.ip)
             }
@@ -235,12 +272,13 @@ class MainActivity : AppCompatActivity() {
         listOf(
             binding.btnPower to RemoteCommand.POWER,
             binding.btnMute to RemoteCommand.MUTE,
+            binding.btnInput to RemoteCommand.INPUT,
             binding.btnVolUp to RemoteCommand.VOL_UP,
             binding.btnVolDown to RemoteCommand.VOL_DOWN,
             binding.btnChUp to RemoteCommand.CH_UP,
             binding.btnChDown to RemoteCommand.CH_DOWN
         ).forEach { (button, command) ->
-            button.setOnClickListener { sendSingle(command) }
+            button.setOnClickListener { sendSingle(it, command) }
         }
     }
 
@@ -265,7 +303,7 @@ class MainActivity : AppCompatActivity() {
             binding.btn8 to RemoteCommand.DIGIT_8,
             binding.btn9 to RemoteCommand.DIGIT_9
         ).forEach { (button, command) ->
-            button.setOnClickListener { sendSingle(command) }
+            button.setOnClickListener { sendSingle(it, command) }
         }
     }
 
@@ -273,6 +311,7 @@ class MainActivity : AppCompatActivity() {
         val pad = binding.touchpadInclude
         pad.touchpadView.listener = object : TouchpadView.Listener {
             override fun onIrCommands(commands: List<RemoteCommand>) {
+                if (commands.isNotEmpty()) ButtonHaptics.vibrate(this@MainActivity)
                 sendSequence(commands, announce = false)
             }
 
@@ -281,14 +320,15 @@ class MainActivity : AppCompatActivity() {
                 binding.lastCommandText.setTextColor(getColor(R.color.accent_teal))
             }
         }
-        pad.btnPadOk.setOnClickListener { sendSingle(RemoteCommand.OK) }
-        pad.btnPadBack.setOnClickListener { sendSingle(RemoteCommand.BACK) }
-        pad.btnPadHome.setOnClickListener { sendSingle(RemoteCommand.HOME) }
+        pad.btnPadOk.setOnClickListener { sendSingle(it, RemoteCommand.OK) }
+        pad.btnPadBack.setOnClickListener { sendSingle(it, RemoteCommand.BACK) }
+        pad.btnPadHome.setOnClickListener { sendSingle(it, RemoteCommand.HOME) }
     }
 
     private fun setupKeyboard() {
         val kb = binding.keyboardInclude
         kb.btnResetKeyboardCursor.setOnClickListener {
+            ButtonHaptics.click(it)
             keyboardNavigator.resetCursor()
             updateKeyboardCursorLabel()
             Toast.makeText(this, R.string.reset_tv_keyboard_cursor, Toast.LENGTH_SHORT).show()
@@ -320,7 +360,10 @@ class MainActivity : AppCompatActivity() {
                         columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
                         setMargins(2, 2, 2, 2)
                     }
-                    setOnClickListener { onSoftKey(ch) }
+                    setOnClickListener {
+                        ButtonHaptics.click(it)
+                        onSoftKey(ch)
+                    }
                 }
                 grid.addView(button)
             }
@@ -340,7 +383,10 @@ class MainActivity : AppCompatActivity() {
                 columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 2f)
                 setMargins(2, 2, 2, 2)
             }
-            setOnClickListener { onClick() }
+            setOnClickListener {
+                ButtonHaptics.click(it)
+                onClick()
+            }
         }
         grid.addView(button)
     }
@@ -365,6 +411,11 @@ class MainActivity : AppCompatActivity() {
             keyboardNavigator.col + 1,
             keyboardNavigator.currentChar().toString()
         )
+    }
+
+    private fun sendSingle(view: View?, command: RemoteCommand) {
+        if (view != null) ButtonHaptics.click(view) else ButtonHaptics.vibrate(this)
+        sendSingle(command)
     }
 
     private fun sendSingle(command: RemoteCommand) {
@@ -536,4 +587,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private enum class Mode { MOUSE, KEYBOARD, CLASSIC }
+
+    companion object {
+        const val EXTRA_WIFI_IP = "wifi_ip"
+        const val EXTRA_SEND_COMMANDS = "send_commands"
+    }
 }
