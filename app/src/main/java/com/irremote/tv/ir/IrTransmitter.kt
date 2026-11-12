@@ -11,6 +11,11 @@ sealed class TransmitResult {
     ) : TransmitResult()
 
     data class Failed(val reason: String) : TransmitResult()
+
+    companion object {
+        /** Success for links that don't emit an IR pattern (Wi‑Fi, Bluetooth). */
+        val NETWORK_SENT: TransmitResult = Sent(IrPattern(0, intArrayOf(1)), repeats = 1)
+    }
 }
 
 interface IrTransmitter {
