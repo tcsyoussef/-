@@ -104,17 +104,27 @@ class MockSmartCenterServer(
                     writeResponse(writer, 404, "text/plain", "not found")
                 }
             } else {
-                if (method == "POST" && path.startsWith("/apps/SmartCenter")) {
-                    receivedBodies += body
-                    receivedContentTypes += contentType
-                    val code = statusOverride.get()
-                    if (code in 200..299) {
-                        writeResponse(writer, code, "text/plain", "OK")
-                    } else {
-                        writeResponse(writer, code, "text/plain", "ERR")
+                val smartCenter = path.contains("smartcenter", ignoreCase = true)
+                when {
+                    method == "GET" && smartCenter -> {
+                        writeResponse(
+                            writer,
+                            200,
+                            "application/xml",
+                            """<?xml version="1.0"?><service><name>SmartCenter</name><state>running</state></service>"""
+                        )
                     }
-                } else {
-                    writeResponse(writer, 404, "text/plain", "not found")
+                    method == "POST" && smartCenter -> {
+                        receivedBodies += body
+                        receivedContentTypes += contentType
+                        val code = statusOverride.get()
+                        if (code in 200..299 || code == 404) {
+                            writeResponse(writer, code, "text/plain", if (code == 404) "ERR" else "OK")
+                        } else {
+                            writeResponse(writer, code, "text/plain", "ERR")
+                        }
+                    }
+                    else -> writeResponse(writer, 404, "text/plain", "not found")
                 }
             }
         }

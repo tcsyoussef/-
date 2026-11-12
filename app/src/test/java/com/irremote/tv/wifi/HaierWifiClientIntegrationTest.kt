@@ -51,12 +51,24 @@ class HaierWifiClientIntegrationTest {
         assertTrue(client.send(RemoteCommand.MENU) is TransmitResult.Sent)
         assertTrue(client.send(RemoteCommand.INPUT) is TransmitResult.Sent)
 
-        assertTrue(server.receivedBodies.any { it == "<?xml version='1.0' ?><remote><key code='1048'/></remote>" })
-        assertTrue(server.receivedBodies.any { it == "<?xml version='1.0' ?><remote><key code='1066'/></remote>" })
-        assertTrue(server.receivedBodies.any { it == "<?xml version='1.0' ?><remote><key code='1056'/></remote>" })
+        // Haier V300S body is tried first and accepted by the mock
+        assertTrue(server.receivedBodies.any { it.contains("code='1048'") })
+        assertTrue(server.receivedBodies.any { it.contains("code='1066'") })
+        assertTrue(server.receivedBodies.any { it.contains("code='1056'") })
+        assertTrue(
+            server.receivedBodies.any {
+                it == "<?xml version='1.0' ?><remote><key code='1048'/><?xml version='1.0' ?>"
+            }
+        )
         assertTrue(
             server.receivedContentTypes.any { it.contains("ISO-8859-1", ignoreCase = true) }
         )
+    }
+
+    @Test
+    fun postKey_acceptsHttp404LikeSomeVestelFirmwares() {
+        server.setCommandStatus(404)
+        assertTrue(client.postKey("127.0.0.1", 1012, server.commandPort))
     }
 
     @Test

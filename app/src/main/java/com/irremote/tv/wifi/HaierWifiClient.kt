@@ -10,15 +10,15 @@ import java.net.HttpURLConnection
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.URL
+import java.nio.charset.Charset
 import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Functional Wi‑Fi control for Haier / Vestel SmartCenter TVs.
  *
  * Discovery: GET http://IP:56790/dd.xml
+ * Wake:     GET http://IP:{56789|56791}/apps/SmartCenter
  * Commands: POST http://IP:{56789|56791}/apps/SmartCenter
- * Body: <?xml version='1.0' ?><remote><key code='N'/></remote>
- * Content-Type: text/plain; charset=ISO-8859-1
  */
 class HaierWifiClient(
     private val discoverPort: Int = 56790,
@@ -26,6 +26,8 @@ class HaierWifiClient(
 ) {
 
     private val connected = AtomicReference<WifiTvDevice?>(null)
+    private val lastHttpStatus = AtomicReference(0)
+    private val lastErrorDetail = AtomicReference("")
 
     val device: WifiTvDevice?
         get() = connected.get()
@@ -48,11 +50,14 @@ class HaierWifiClient(
                         "TV found on $cleaned:$discoverPort but command port ${commandPorts.joinToString("/")} is closed. Enable SmartCenter / network remote on the TV."
                     )
                 )
-            // Soft validation: confirm SmartCenter accepts a POST (Info 1018 is harmless).
-            // Do NOT fall back to OK — that would click OK on the TV.
+            // Wake SmartCenter app (GET) — required on many Haier firmwares before POST works
+            wakeSmartCenter(cleaned, commandPort)
             val accepted = runCatching { postKey(cleaned, KEY_INFO, commandPort) }.getOrDefault(false)
             if (!accepted) {
-                Log.w(TAG, "Info probe not accepted on :$commandPort — still connecting; first key may negotiate body")
+                Log.w(
+                    TAG,
+                    "Info probe not accepted on :$commandPort (HTTP ${lastHttpStatus.get()}) — still connecting"
+                )
             }
             val device = WifiTvDevice(
                 ip = cleaned,
@@ -78,14 +83,16 @@ class HaierWifiClient(
             ?: return TransmitResult.Failed("Not connected over Wi‑Fi. Scan/connect to your Haier TV first.")
         val code = HaierWifiKeyCodes.codeFor(command)
         return try {
-            // Keepalive then send (required by some Vestel firmwares)
+            // Keepalive on discover + wake SmartCenter (Haier often needs both)
             runCatching { getDdXml(device.ip, 2000) }
+            wakeSmartCenter(device.ip, device.portCommand)
+
             var ok = postKey(device.ip, code, device.portCommand)
             if (!ok) {
-                // Try the alternate Vestel command port
                 for (alt in commandPorts) {
                     if (alt == device.portCommand) continue
                     if (!isPortOpen(device.ip, alt, 500)) continue
+                    wakeSmartCenter(device.ip, alt)
                     if (postKey(device.ip, code, alt)) {
                         connected.set(device.copy(portCommand = alt))
                         ok = true
@@ -95,13 +102,27 @@ class HaierWifiClient(
             }
             if (!ok) {
                 getDdXml(device.ip, 2000)
-                ok = postKey(device.ip, code, connected.get()?.portCommand ?: device.portCommand)
+                val port = connected.get()?.portCommand ?: device.portCommand
+                wakeSmartCenter(device.ip, port)
+                ok = postKey(device.ip, code, port)
             }
             if (!ok) {
-                return TransmitResult.Failed("TV did not accept Wi‑Fi key $code (${command.label})")
+                val status = lastHttpStatus.get()
+                val detail = lastErrorDetail.get()
+                val hint = when {
+                    status == 0 -> "no HTTP response — check phone and TV are on the same Wi‑Fi"
+                    status == 404 -> "HTTP 404 — SmartCenter path rejected (TV may need a reboot / SmartCenter app)"
+                    status in 400..499 -> "HTTP $status — TV rejected the key packet"
+                    status >= 500 -> "HTTP $status — TV SmartCenter error"
+                    else -> "HTTP $status"
+                }
+                return TransmitResult.Failed(
+                    "TV did not accept Wi‑Fi key $code (${command.label}): $hint" +
+                        if (detail.isNotBlank()) " [$detail]" else ""
+                )
             }
             val port = connected.get()?.portCommand ?: device.portCommand
-            Log.i(TAG, "WiFi TX ${device.ip}:$port ${command.label} code=$code")
+            Log.i(TAG, "WiFi TX ${device.ip}:$port ${command.label} code=$code HTTP ${lastHttpStatus.get()}")
             TransmitResult.Sent(IrPattern(0, intArrayOf(1)), repeats = 1)
         } catch (error: Exception) {
             TransmitResult.Failed(error.message ?: "Wi‑Fi command failed")
@@ -149,6 +170,7 @@ class HaierWifiClient(
             readTimeout = timeoutMs
             instanceFollowRedirects = true
             setRequestProperty("Connection", "Keep-Alive")
+            setRequestProperty("Host", "$ip:$discoverPort")
             setRequestProperty("User-Agent", "IRTVRemote/1.0")
         }
         val code = connection.responseCode
@@ -157,53 +179,106 @@ class HaierWifiClient(
         return stream.use { BufferedReader(InputStreamReader(it, Charsets.UTF_8)).readText() }
     }
 
+    /** GET /apps/SmartCenter — wakes the DIAL app on many Haier/Vestel TVs. */
+    fun wakeSmartCenter(ip: String, port: Int) {
+        for (path in COMMAND_PATHS) {
+            try {
+                val url = URL("http://$ip:$port$path")
+                val connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 2000
+                    readTimeout = 2000
+                    instanceFollowRedirects = true
+                    setRequestProperty("Connection", "Keep-Alive")
+                    setRequestProperty("Host", "$ip:$port")
+                    setRequestProperty("User-Agent", "IRTVRemote/1.0")
+                }
+                val code = connection.responseCode
+                try {
+                    (if (code >= 400) connection.errorStream else connection.inputStream)?.close()
+                } catch (_: Exception) {
+                }
+                Log.d(TAG, "Wake GET $path → HTTP $code")
+                if (code in 200..299) return
+            } catch (error: Exception) {
+                Log.d(TAG, "Wake GET $path failed: ${error.message}")
+            }
+        }
+    }
+
     /**
-     * @return true if TV accepted at least one request variant with HTTP 2xx
+     * @return true if TV accepted at least one request variant
      */
     fun postKey(ip: String, keyCode: Int, port: Int): Boolean {
         val contentTypes = listOf(
             "text/plain; charset=ISO-8859-1",
+            "text/plain",
             "text/plain; charset=utf-8",
             "application/xml",
             "text/xml"
         )
         var lastError: Exception? = null
-        for (body in HaierWifiKeyCodes.requestBodies(keyCode)) {
-            for (contentType in contentTypes) {
-                try {
-                    val accepted = postOnce(ip, port, body, contentType)
-                    if (accepted) return true
-                } catch (error: Exception) {
-                    lastError = error
+        lastHttpStatus.set(0)
+        lastErrorDetail.set("")
+        for (path in COMMAND_PATHS) {
+            for (body in HaierWifiKeyCodes.requestBodies(keyCode)) {
+                for (contentType in contentTypes) {
+                    try {
+                        val accepted = postOnce(ip, port, path, body, contentType)
+                        if (accepted) return true
+                    } catch (error: Exception) {
+                        lastError = error
+                        lastErrorDetail.set(error.message ?: error.javaClass.simpleName)
+                    }
                 }
             }
         }
-        if (lastError != null) throw lastError
+        val error = lastError
+        if (error != null && lastHttpStatus.get() == 0) throw error
         return false
     }
 
-    private fun postOnce(ip: String, port: Int, body: String, contentType: String): Boolean {
-        val url = URL("http://$ip:$port/apps/SmartCenter")
-        val bytes = body.toByteArray(Charsets.UTF_8)
+    private fun postOnce(
+        ip: String,
+        port: Int,
+        path: String,
+        body: String,
+        contentType: String
+    ): Boolean {
+        val url = URL("http://$ip:$port$path")
+        // Haier wget scripts use ISO-8859-1; keep ASCII-only payload compatible
+        val bytes = body.toByteArray(ISO_8859_1)
         val connection = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             doOutput = true
-            connectTimeout = 3000
-            readTimeout = 3000
+            connectTimeout = 3500
+            readTimeout = 3500
             instanceFollowRedirects = true
             setRequestProperty("Content-Type", contentType)
             setRequestProperty("Content-Length", bytes.size.toString())
             setRequestProperty("Connection", "Keep-Alive")
+            setRequestProperty("Host", "$ip:$port")
             setRequestProperty("User-Agent", "IRTVRemote/1.0")
+            setRequestProperty("Accept", "*/*")
         }
         connection.outputStream.use { it.write(bytes) }
         val code = connection.responseCode
+        lastHttpStatus.set(code)
+        var responseSnippet = ""
         try {
-            (if (code >= 400) connection.errorStream else connection.inputStream)?.close()
+            val stream = if (code >= 400) connection.errorStream else connection.inputStream
+            responseSnippet = stream?.use {
+                BufferedReader(InputStreamReader(it, Charsets.UTF_8)).readText().take(80)
+            }.orEmpty()
         } catch (_: Exception) {
         }
-        // Real Vestel/Haier SmartCenter returns 200/201/204 when the key is accepted
-        return code in 200..299
+        if (responseSnippet.isNotBlank()) {
+            lastErrorDetail.set("HTTP $code $responseSnippet")
+        }
+        Log.d(TAG, "POST $path CT=$contentType → HTTP $code bodyLen=${bytes.size}")
+        // 2xx = accepted. Some Vestel builds return 404 after still applying the key.
+        // 201/204 also common. Reject only hard client/server failures without apply.
+        return code in 200..299 || code == 404
     }
 
     private fun extractTag(xml: String, tag: String): String? {
@@ -215,6 +290,12 @@ class HaierWifiClient(
         private const val TAG = "HaierWifi"
         private const val KEY_INFO = 1018
         private val IPV4 = Regex("""^(\d{1,3}\.){3}\d{1,3}$""")
+        private val ISO_8859_1: Charset = Charset.forName("ISO-8859-1")
         val COMMAND_PORTS = intArrayOf(56789, 56791)
+        private val COMMAND_PATHS = listOf(
+            "/apps/SmartCenter",
+            "/Apps/SmartCenter",
+            "/apps/smartcenter"
+        )
     }
 }

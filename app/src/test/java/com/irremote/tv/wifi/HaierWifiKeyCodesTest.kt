@@ -50,9 +50,13 @@ class HaierWifiKeyCodesTest {
     }
 
     @Test
-    fun requestBodies_includePrimaryVestelFormat() {
+    fun requestBodies_preferHaierV300SThenVestel() {
         val bodies = HaierWifiKeyCodes.requestBodies(1048)
-        assertEquals("<?xml version='1.0' ?><remote><key code='1048'/></remote>", bodies.first())
-        assertTrue(bodies.size >= 2)
+        assertEquals(
+            "<?xml version='1.0' ?><remote><key code='1048'/><?xml version='1.0' ?>",
+            bodies.first()
+        )
+        assertTrue(bodies.contains("<?xml version='1.0' ?><remote><key code='1048'/></remote>"))
+        assertTrue(bodies.size >= 3)
     }
 }

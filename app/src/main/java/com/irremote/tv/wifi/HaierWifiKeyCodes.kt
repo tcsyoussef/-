@@ -4,8 +4,11 @@ import com.irremote.tv.ir.RemoteCommand
 
 /**
  * Haier / Vestel SmartCenter LAN key codes.
- * Aligned with working open-source Vestel/Toshiba/Haier LAN remotes
- * (Home Assistant vestel_television, wget SmartCenter scripts).
+ *
+ * Body formats differ by firmware:
+ * - Haier V300S / MB130 often need a trailing `<?xml …?>` after the key tag
+ * - Vestel wget scripts use a normal closed `<remote>` document
+ * - Older Domoticz scripts omit quotes around the code attribute
  */
 object HaierWifiKeyCodes {
     fun codeFor(command: RemoteCommand): Int = when (command) {
@@ -21,11 +24,9 @@ object HaierWifiKeyCodes {
         RemoteCommand.RIGHT -> 1022
         RemoteCommand.OK -> 1053
         RemoteCommand.BACK -> 1010
-        // HOME was wrongly mapped to Exit(1037); Vestel/HA maps home -> 1048
+        // Vestel/HA home; some Domoticz lists call 1048 "menu"
         RemoteCommand.HOME -> 1048
-        // MENU was wrongly mapped to 1048; Vestel/HA maps menu -> 1066
         RemoteCommand.MENU -> 1066
-        // SOURCE / INPUT
         RemoteCommand.INPUT -> 1056
         RemoteCommand.DIGIT_0 -> 1000
         RemoteCommand.DIGIT_1 -> 1001
@@ -39,14 +40,21 @@ object HaierWifiKeyCodes {
         RemoteCommand.DIGIT_9 -> 1009
     }
 
-    /** Primary body used by working wget / Vestel remotes. */
+    /** Primary Vestel wget body. */
     fun requestBody(keyCode: Int): String =
         "<?xml version='1.0' ?><remote><key code='$keyCode'/></remote>"
 
-    /** Bodies used by real Vestel remotes (try in order). */
+    /**
+     * Bodies used by real Haier/Vestel remotes (try in order).
+     * First entry is the Haier V300S / MB130 format that many Haier TVs require.
+     */
     fun requestBodies(keyCode: Int): List<String> = listOf(
+        // Haier V300S API — intentionally malformed trailing XML (required by firmware)
+        "<?xml version='1.0' ?><remote><key code='$keyCode'/><?xml version='1.0' ?>",
         requestBody(keyCode),
+        "<remote><key code=$keyCode/></remote>",
         "<remote><key code=$keyCode /></remote>",
-        "<remote><key code=\"$keyCode\"/></remote>"
+        "<remote><key code=\"$keyCode\"/></remote>",
+        "<?xml version=\"1.0\"?><remote><key code=\"$keyCode\"/></remote>"
     )
 }
