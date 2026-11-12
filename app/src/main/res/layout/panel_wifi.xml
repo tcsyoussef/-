@@ -57,6 +57,15 @@
             android:text="@string/wifi_connect" />
     </LinearLayout>
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnWifiLast"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textAllCaps="false"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/wifiScanResultText"
         android:layout_width="match_parent"

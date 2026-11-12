@@ -22,6 +22,12 @@ class TouchpadView @JvmOverloads constructor(
     interface Listener {
         fun onIrCommands(commands: List<com.irremote.tv.ir.RemoteCommand>)
         fun onStatus(message: String)
+
+        /** Return true when a real pointer (Bluetooth mouse) consumed the movement. */
+        fun onPointerDelta(dx: Float, dy: Float): Boolean = false
+
+        /** Return true when a real pointer consumed the tap as a click. */
+        fun onTap(): Boolean = false
     }
 
     var listener: Listener? = null
@@ -93,6 +99,7 @@ class TouchpadView @JvmOverloads constructor(
                 if (hypot(event.x - downX, event.y - downY) > 18f) {
                     moved = true
                 }
+                if (listener?.onPointerDelta(dx, dy) == true) return true
                 val commands = controller.onMove(dx, dy)
                 if (commands.isNotEmpty()) {
                     listener?.onIrCommands(commands)
@@ -104,7 +111,9 @@ class TouchpadView @JvmOverloads constructor(
                 parent.requestDisallowInterceptTouchEvent(false)
                 active = false
                 invalidate()
-                if (!moved && event.actionMasked == MotionEvent.ACTION_UP) {
+                if (!moved && event.actionMasked == MotionEvent.ACTION_UP && listener?.onTap() == true) {
+                    performClick()
+                } else if (!moved && event.actionMasked == MotionEvent.ACTION_UP) {
                     val cmd = controller.onClick()
                     listener?.onIrCommands(listOf(cmd))
                     listener?.onStatus("Mouse → OK")

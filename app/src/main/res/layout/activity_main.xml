@@ -65,11 +65,27 @@
                 android:layout_weight="1"
                 android:text="@string/link_wifi"
                 android:textAllCaps="false" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/linkBluetooth"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:text="@string/link_bluetooth"
+                android:textAllCaps="false" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <include
             android:id="@+id/wifiInclude"
             layout="@layout/panel_wifi"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" />
+
+        <include
+            android:id="@+id/bluetoothInclude"
+            layout="@layout/panel_bluetooth"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp" />
