@@ -16,6 +16,7 @@ import com.irremote.tv.wifi.HaierWifiClient
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.util.concurrent.Executors
 
 /**
  * Finds out which platform a TV runs (Android TV, Samsung, LG, Roku, Haier SmartCenter),
@@ -39,16 +40,35 @@ class WifiRemoteManager(
     override val isReady: Boolean get() = session?.isOpen == true
     override val supportsText: Boolean get() = session?.supportsText == true
 
-    override fun send(command: RemoteCommand): TransmitResult =
-        session?.send(command) ?: TransmitResult.Failed("Connect to a TV in the Wi‑Fi panel first")
+    override fun send(command: RemoteCommand): TransmitResult = withRecovery { it.send(command) }
 
-    override fun sendText(text: String): TransmitResult =
-        session?.sendText(text) ?: TransmitResult.Failed("Connect to a TV in the Wi‑Fi panel first")
+    override fun sendText(text: String): TransmitResult = withRecovery { it.sendText(text) }
 
     override fun inputSources(): List<InputSource> = session?.inputSources().orEmpty()
 
-    override fun selectInput(source: InputSource): TransmitResult =
-        session?.selectInput(source) ?: TransmitResult.Failed("Connect to a TV first")
+    override fun selectInput(source: InputSource): TransmitResult = withRecovery { it.selectInput(source) }
+
+    /** Runs [action]; if the TV dropped the connection, reconnects silently and tries once more. */
+    private fun withRecovery(action: (RemoteSession) -> TransmitResult): TransmitResult {
+        val current = session ?: return TransmitResult.Failed(NOT_CONNECTED)
+        val result = action(current)
+        if (result !is TransmitResult.Failed || current.isOpen) return result
+        val revived = reconnect(current.tv) ?: return result
+        return action(revived)
+    }
+
+    @Synchronized
+    private fun reconnect(tv: DiscoveredTv): RemoteSession? {
+        session?.takeIf { it.isOpen && it.tv.ip == tv.ip }?.let { return it }
+        return when (val outcome = connect(tv, null)) {
+            is ConnectOutcome.Connected -> outcome.session
+            is ConnectOutcome.NeedsPin -> {
+                outcome.cancel()
+                null
+            }
+            is ConnectOutcome.Failed -> null
+        }
+    }
 
     fun disconnect() {
         session?.close()
@@ -60,7 +80,16 @@ class WifiRemoteManager(
     /** Which platform answers at [ip]; null when no supported service is listening. */
     fun detect(ip: String): DiscoveredTv? = classify(ip, openPorts(ip))
 
-    fun openPorts(ip: String): Set<Int> = allPorts().filterTo(LinkedHashSet()) { isPortOpen(ip, it, probeTimeoutMs) }
+    fun openPorts(ip: String): Set<Int> {
+        val ports = allPorts()
+        val pool = Executors.newFixedThreadPool(ports.size)
+        return try {
+            val probes = ports.map { port -> port to pool.submit<Boolean> { isPortOpen(ip, port, probeTimeoutMs) } }
+            probes.filterTo(ArrayList()) { (_, open) -> open.get() }.mapTo(LinkedHashSet()) { it.first }
+        } finally {
+            pool.shutdownNow()
+        }
+    }
 
     fun allPorts(): List<Int> = listOf(
         ports.androidTvRemote, ports.androidTvPairing,
@@ -69,16 +98,19 @@ class WifiRemoteManager(
         ports.roku, ports.haierDiscover
     )
 
+    /** Every platform answering at an IP, best first. */
+    fun candidates(open: Set<Int>): List<TvProtocol> = buildList {
+        if (ports.androidTvRemote in open || ports.androidTvPairing in open) add(TvProtocol.ANDROID_TV)
+        if (ports.samsungWs in open || ports.samsungWss in open) add(TvProtocol.SAMSUNG)
+        if (ports.lgWs in open || ports.lgWss in open) add(TvProtocol.LG_WEBOS)
+        if (ports.roku in open) add(TvProtocol.ROKU)
+        if (ports.haierDiscover in open) add(TvProtocol.HAIER_VESTEL)
+    }
+
     fun classify(ip: String, open: Set<Int>): DiscoveredTv? {
-        val protocol = when {
-            ports.androidTvRemote in open || ports.androidTvPairing in open -> TvProtocol.ANDROID_TV
-            ports.samsungWs in open || ports.samsungWss in open -> TvProtocol.SAMSUNG
-            ports.lgWs in open || ports.lgWss in open -> TvProtocol.LG_WEBOS
-            ports.roku in open -> TvProtocol.ROKU
-            ports.haierDiscover in open -> TvProtocol.HAIER_VESTEL
-            else -> return null
-        }
-        return DiscoveredTv(ip, protocol, friendlyName(ip, protocol) ?: protocol.displayName)
+        val protocols = candidates(open).ifEmpty { return null }
+        val name = protocols.firstNotNullOfOrNull { friendlyName(ip, it) } ?: protocols.first().displayName
+        return DiscoveredTv(ip, protocols.first(), name, alternatives = protocols.drop(1))
     }
 
     private fun friendlyName(ip: String, protocol: TvProtocol): String? = runCatching {
@@ -89,6 +121,9 @@ class WifiRemoteManager(
                 tag(it, "user-device-name") ?: tag(it, "friendly-device-name") ?: tag(it, "model-name")
             }
             TvProtocol.HAIER_VESTEL -> get("http://$ip:${ports.haierDiscover}/dd.xml")?.let { tag(it, "friendlyName") }
+            // Google TVs with Chromecast built-in report the name set on the TV
+            TvProtocol.ANDROID_TV -> get("http://$ip:${ports.cast}/setup/eureka_info?params=name")
+                ?.let { JSONObject(it).optString("name") }
             else -> null
         }
     }.getOrNull()?.takeIf { it.isNotBlank() }
@@ -107,11 +142,47 @@ class WifiRemoteManager(
             "No supported TV found at $cleaned. Check the TV is on, on the same Wi‑Fi, " +
                 "and its remote/mobile-control setting is enabled."
         )
-        return connect(tv, prompt)
+        return connect(tv, prompt, probeAgain = false)
     }
 
-    /** Blocking; call off the main thread. */
-    fun connect(tv: DiscoveredTv, prompt: PromptListener?): ConnectOutcome {
+    /**
+     * Connects to the TV saved last time. If it no longer answers at its old IP (the router gave
+     * it a new one), [rescan] is used to find it again by name. Blocking.
+     */
+    fun connectSaved(prompt: PromptListener?, rescan: () -> List<DiscoveredTv>): ConnectOutcome {
+        val last = lastTv() ?: return ConnectOutcome.Failed(NOT_CONNECTED)
+        val first = connect(last, prompt)
+        if (first !is ConnectOutcome.Failed) return first
+        val found = rescan()
+        val moved = found.firstOrNull { it.ip != last.ip && it.name == last.name }
+            ?: found.singleOrNull()?.takeIf { it.ip != last.ip }
+            ?: return first
+        return connect(moved, prompt)
+    }
+
+    /**
+     * Blocking; call off the main thread. Tries the TV's main platform first, then every other
+     * platform answering at the same IP, so the user never has to pick a protocol.
+     */
+    fun connect(tv: DiscoveredTv, prompt: PromptListener?, probeAgain: Boolean = true): ConnectOutcome {
+        val tried = LinkedHashSet<TvProtocol>()
+        var failure: ConnectOutcome.Failed? = null
+        fun attempt(protocols: List<TvProtocol>): ConnectOutcome? {
+            for (protocol in protocols) {
+                if (!tried.add(protocol)) continue
+                val outcome = connectWith(tv.copy(protocol = protocol, alternatives = emptyList()), prompt)
+                if (outcome !is ConnectOutcome.Failed) return outcome
+                failure = outcome
+            }
+            return null
+        }
+        attempt(listOf(tv.protocol) + tv.alternatives)?.let { return it }
+        // A saved TV only remembers one platform: look again for anything else at that IP
+        if (probeAgain && tv.alternatives.isEmpty()) detect(tv.ip)?.let { fresh -> attempt(listOf(fresh.protocol) + fresh.alternatives)?.let { return it } }
+        return failure ?: ConnectOutcome.Failed(NOT_CONNECTED)
+    }
+
+    private fun connectWith(tv: DiscoveredTv, prompt: PromptListener?): ConnectOutcome {
         disconnect()
         return try {
             when (tv.protocol) {
@@ -180,6 +251,7 @@ class WifiRemoteManager(
 
     companion object {
         private const val TAG = "WifiRemoteManager"
+        private const val NOT_CONNECTED = "Connect to a TV first"
         private val IPV4 = Regex("""^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$""")
     }
 }

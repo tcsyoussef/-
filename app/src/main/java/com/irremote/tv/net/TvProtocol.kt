@@ -17,7 +17,9 @@ data class DiscoveredTv(
     val ip: String,
     val protocol: TvProtocol,
     val name: String,
-    val port: Int = 0
+    val port: Int = 0,
+    /** Other platforms answering at the same IP, tried in order if [protocol] fails. */
+    val alternatives: List<TvProtocol> = emptyList()
 ) {
     val displayLabel: String
         get() = if (name == protocol.displayName) name else "$name · ${protocol.displayName}"
@@ -32,5 +34,6 @@ data class TvPorts(
     val lgWs: Int = 3000,
     val lgWss: Int = 3001,
     val roku: Int = 8060,
-    val haierDiscover: Int = 56790
+    val haierDiscover: Int = 56790,
+    val cast: Int = 8008
 )

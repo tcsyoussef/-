@@ -8,10 +8,17 @@ interface PairingStore {
     fun get(key: String): String?
     fun put(key: String, value: String?)
 
-    fun samsungToken(ip: String) = get("samsung_token_$ip")
-    fun setSamsungToken(ip: String, token: String?) = put("samsung_token_$ip", token)
-    fun lgClientKey(ip: String) = get("lg_key_$ip")
-    fun setLgClientKey(ip: String, key: String?) = put("lg_key_$ip", key)
+    // The "_last" copies let a TV that got a new IP from the router reconnect without a new prompt
+    fun samsungToken(ip: String) = get("samsung_token_$ip") ?: get("samsung_token_last")
+    fun setSamsungToken(ip: String, token: String?) {
+        put("samsung_token_$ip", token)
+        if (token != null) put("samsung_token_last", token)
+    }
+    fun lgClientKey(ip: String) = get("lg_key_$ip") ?: get("lg_key_last")
+    fun setLgClientKey(ip: String, key: String?) {
+        put("lg_key_$ip", key)
+        if (key != null) put("lg_key_last", key)
+    }
 
     fun lastTv(): DiscoveredTv? {
         val ip = get("last_ip") ?: return null

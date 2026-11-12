@@ -7,6 +7,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -141,6 +145,12 @@ class MainActivity : AppCompatActivity() {
         setupTouchpad()
         setupKeyboard()
         updateHeader()
+        runCatching {
+            getSystemService(ConnectivityManager::class.java).registerNetworkCallback(
+                NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),
+                wifiCallback
+            )
+        }
 
         val automationIp = intent.getStringExtra(EXTRA_WIFI_IP)?.trim()?.takeIf { it.isNotEmpty() }
         if (automationIp != null) {
@@ -156,10 +166,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun restoreLastConnection() {
         when (prefs.getString(PREF_LINK, null)) {
-            ControlLink.WIFI.name -> {
-                val last = wifi.lastTv()
-                if (last != null) connectTv(last, null) else openConnectSheet()
-            }
+            ControlLink.WIFI.name -> if (wifi.lastTv() != null) reconnectWifi() else openConnectSheet()
             ControlLink.IR.name -> if (ir.hasBuiltInEmitter) activate(ControlLink.IR) else openConnectSheet()
             ControlLink.BLUETOOTH.name -> {
                 if (bluetooth.isSupported && bluetooth.hasPermission() && bluetooth.isEnabled) {
@@ -361,12 +368,7 @@ class MainActivity : AppCompatActivity() {
         sb.wifiEmpty.visibility = View.GONE
         sb.btnSearchAgain.isEnabled = false
         scanExecutor.execute {
-            val devices = try {
-                val prefix = WifiTvScanner(this).localSubnetPrefix()
-                if (prefix == null) emptyList() else TvDiscovery(wifi).scanSubnet(prefix)
-            } catch (_: Exception) {
-                emptyList()
-            }
+            val devices = scanLocalTvs()
             mainHandler.post {
                 scanning = false
                 foundTvs = devices
@@ -375,6 +377,13 @@ class MainActivity : AppCompatActivity() {
                 s.btnSearchAgain.isEnabled = true
                 renderWifiDevices()
                 if (devices.isEmpty() && wifi.lastTv() == null) s.wifiEmpty.visibility = View.VISIBLE
+                // Only one TV on the network: connect to it without asking
+                val only = devices.singleOrNull()
+                if (only != null && s.wifiSection.visibility == View.VISIBLE &&
+                    activeLink != ControlLink.WIFI && connecting == null
+                ) {
+                    connectTv(only, null)
+                }
             }
         }
     }
@@ -408,6 +417,19 @@ class MainActivity : AppCompatActivity() {
                 .setPositiveButton(R.string.ok, null)
                 .show()
         }
+    }
+
+    /** Reconnects to the saved TV, finding it again if the router gave it a new IP. */
+    private fun reconnectWifi() {
+        val last = wifi.lastTv() ?: return
+        startConnect(last.name, null) { wifi.connectSaved(tvPrompt) { scanLocalTvs() } }
+    }
+
+    private fun scanLocalTvs(): List<DiscoveredTv> = try {
+        val prefix = WifiTvScanner(this).localSubnetPrefix()
+        if (prefix == null) emptyList() else TvDiscovery(wifi).scanSubnet(prefix)
+    } catch (_: Exception) {
+        emptyList()
     }
 
     private fun connectWifi(ip: String, row: ItemDeviceBinding?) =
@@ -951,6 +973,33 @@ class MainActivity : AppCompatActivity() {
         return super.onGenericMotionEvent(event)
     }
 
+    // ------------------------------------------------------------ auto reconnect
+
+    private val wifiCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            mainHandler.postDelayed({ autoReconnectIfDropped() }, 1500)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        autoReconnectIfDropped()
+    }
+
+    private var lastAutoReconnect = 0L
+
+    /** Wi‑Fi is the chosen link (not disconnected by the user) but the TV isn't connected. */
+    private fun autoReconnectIfDropped() {
+        if (isFinishing || connecting != null || sheet?.isShowing == true) return
+        val wantsWifi = activeLink == ControlLink.WIFI ||
+            (activeLink == null && prefs.getString(PREF_LINK, null) == ControlLink.WIFI.name)
+        if (!wantsWifi || wifi.isReady || wifi.lastTv() == null) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - lastAutoReconnect < 30_000) return
+        lastAutoReconnect = now
+        reconnectWifi()
+    }
+
     // ------------------------------------------------------------ misc
 
     private fun scheduleAutomationCommands(names: Array<String>) {
@@ -984,6 +1033,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         promptDialog?.dismiss()
         sheet?.dismiss()
+        runCatching { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(wifiCallback) }
         bluetooth.stop()
         ioExecutor.shutdownNow()
         scanExecutor.shutdownNow()
