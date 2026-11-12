@@ -31,6 +31,9 @@ class MockAndroidTv : AutoCloseable {
     val keyCodes = CopyOnWriteArrayList<Int>()
     val batchTexts = CopyOnWriteArrayList<String>()
     val appLinks = CopyOnWriteArrayList<String>()
+    val voiceSessions = CopyOnWriteArrayList<Int>()
+    val voicePayloads = CopyOnWriteArrayList<ByteArray>()
+    val voiceEnds = CopyOnWriteArrayList<Int>()
     @Volatile var sendImeFocus = false
 
     private fun server(): SSLServerSocket =
@@ -106,9 +109,21 @@ class MockAndroidTv : AutoCloseable {
                                 .message(2, ProtoWriter().varint(1, 9))))
                         }
                     }
-                    msg.has(10) -> msg.message(10)?.varint(1)?.let { keyCodes += it.toInt() }
+                    msg.has(10) -> msg.message(10)?.varint(1)?.let { code ->
+                        keyCodes += code.toInt()
+                        // KEYCODE_SEARCH starts a voice session like a real Google TV
+                        if (code.toInt() == 84) {
+                            write(out, ProtoWriter().message(30, ProtoWriter().varint(1, 7).string(2, "com.google.android.katniss")))
+                        }
+                    }
                     msg.has(21) -> msg.message(21)?.message(3)?.message(2)?.string(3)?.let { batchTexts += it }
                     msg.has(90) -> msg.message(90)?.string(1)?.let { appLinks += it }
+                    msg.has(30) -> msg.message(30)?.varint(1)?.toInt()?.let { voiceSessions += it }
+                    msg.has(31) -> msg.message(31)?.let { voice ->
+                        voice.varint(1)?.toInt()?.let { /* session */ }
+                        voice.bytes(2)?.let { voicePayloads += it }
+                    }
+                    msg.has(32) -> msg.message(32)?.varint(1)?.toInt()?.let { voiceEnds += it }
                 }
             }
         }

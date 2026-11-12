@@ -28,6 +28,12 @@ interface RemoteTarget {
     fun launchApp(app: TvApp): TransmitResult =
         TransmitResult.Failed("${app.label} can't be opened over this connection")
 
+    /** Streams the phone mic to the TV's Assistant (Google TV). Other links use on-device speech→text. */
+    val supportsVoice: Boolean get() = false
+    fun startVoice(): TransmitResult = TransmitResult.Failed("Voice search needs a Wi‑Fi Google TV connection")
+    fun sendVoicePcm(samples: ByteArray): TransmitResult = startVoice()
+    fun endVoice(): TransmitResult = TransmitResult.NETWORK_SENT
+
     /** Sources offered in the Input picker; an empty list means Input switching isn't possible. */
     fun inputSources(): List<InputSource> = listOf(InputSource.INPUT_MENU)
 

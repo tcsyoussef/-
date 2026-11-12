@@ -32,6 +32,8 @@ class AndroidTvSession(
     @Volatile private var hasImeCounter = false
     @Volatile private var hasImeFieldCounter = false
     @Volatile private var imeSeen = false
+    @Volatile private var voiceSessionId: Int? = null
+    private var voiceBeginLatch: CountDownLatch? = null
     private val writeLock = Any()
 
     override val isOpen: Boolean get() = socket?.isClosed == false && ready
@@ -125,6 +127,18 @@ class AndroidTvSession(
                 if (!hasImeFieldCounter) imeFieldCounter = edit.varint(2) ?: imeFieldCounter
                 imeSeen = true
             }
+            // TV starts a voice session after KEYCODE_SEARCH (Google Assistant mic)
+            msg.has(30) -> {
+                val begin = msg.message(30) ?: ProtoMessage.EMPTY
+                val id = (begin.varint(1) ?: 0L).toInt()
+                voiceSessionId = id
+                voiceBeginLatch?.countDown()
+                Log.i(TAG, "TV voice begin session=$id pkg=${begin.string(2)}")
+            }
+            msg.has(32) -> {
+                voiceSessionId = null
+                Log.i(TAG, "TV ended voice session")
+            }
         }
     }
 
@@ -174,6 +188,69 @@ class AndroidTvSession(
         }
     }
 
+    override val supportsVoice: Boolean = true
+
+    /**
+     * Opens Google Assistant voice search on the TV, then waits for the TV's VoiceBegin
+     * so PCM from the phone mic can be streamed.
+     */
+    override fun startVoice(): TransmitResult {
+        voiceSessionId = null
+        val latch = CountDownLatch(1)
+        voiceBeginLatch = latch
+        val search = sendKeyCode(AndroidTvKeys.KEYCODE_SEARCH)
+        if (search is TransmitResult.Failed) {
+            voiceBeginLatch = null
+            return search
+        }
+        return try {
+            if (!latch.await(4, TimeUnit.SECONDS) || voiceSessionId == null) {
+                TransmitResult.Failed("TV did not start voice search. Open Google Assistant on the TV and try again.")
+            } else {
+                val id = voiceSessionId!!
+                // Acknowledge the session (required before the TV accepts audio)
+                write(ProtoWriter().message(30, ProtoWriter().varint(1, id)))
+                TransmitResult.NETWORK_SENT
+            }
+        } catch (error: Exception) {
+            TransmitResult.Failed("Voice search failed: ${error.message}")
+        } finally {
+            voiceBeginLatch = null
+        }
+    }
+
+    override fun sendVoicePcm(samples: ByteArray): TransmitResult {
+        val id = voiceSessionId ?: return TransmitResult.Failed("Voice search is not active")
+        return try {
+            ensureOpen()
+            // Google TV expects ~20 KB chunks of 16-bit LE PCM @ 8 kHz mono
+            var offset = 0
+            while (offset < samples.size) {
+                val end = minOf(offset + VOICE_CHUNK, samples.size)
+                val chunk = samples.copyOfRange(offset, end)
+                write(ProtoWriter().message(31, ProtoWriter().varint(1, id).bytes(2, chunk)))
+                offset = end
+            }
+            TransmitResult.NETWORK_SENT
+        } catch (error: Exception) {
+            ready = false
+            TransmitResult.Failed("Voice audio failed: ${error.message}")
+        }
+    }
+
+    override fun endVoice(): TransmitResult {
+        val id = voiceSessionId ?: return TransmitResult.NETWORK_SENT
+        return try {
+            ensureOpen()
+            write(ProtoWriter().message(32, ProtoWriter().varint(1, id)))
+            TransmitResult.NETWORK_SENT
+        } catch (error: Exception) {
+            TransmitResult.Failed("Couldn't end voice: ${error.message}")
+        } finally {
+            voiceSessionId = null
+        }
+    }
+
     override fun launchApp(app: TvApp): TransmitResult = try {
         ensureOpen()
         write(ProtoWriter().message(90, ProtoWriter().string(1, app.androidTvLink)))
@@ -199,6 +276,9 @@ class AndroidTvSession(
 
     override fun close() {
         ready = false
+        voiceSessionId = null
+        voiceBeginLatch?.countDown()
+        voiceBeginLatch = null
         runCatching { socket?.close() }
         socket = null
     }
@@ -217,6 +297,7 @@ class AndroidTvSession(
                         .varint(2, text.length)
                         .string(3, text))))
         private const val DIRECTION_SHORT = 3
+        private const val VOICE_CHUNK = 20 * 1024
         // PING | KEY | IME | POWER | VOLUME | APP_LINK
         const val OUR_FEATURES = 1L or 2L or 4L or 32L or 64L or 512L
     }

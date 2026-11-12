@@ -51,6 +51,7 @@ import com.irremote.tv.databinding.SheetConnectBinding
 import com.irremote.tv.input.PointerController
 import com.irremote.tv.input.TouchpadView
 import com.irremote.tv.input.TvKeyboardNavigator
+import com.irremote.tv.input.VoiceController
 import com.irremote.tv.ir.AndroidIrTransmitter
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
@@ -114,6 +115,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val micPermissionRequest = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startVoiceSession()
+        else snack(getString(R.string.voice_need_mic))
+    }
+
+    private lateinit var voice: VoiceController
+    private var voiceStreaming = false
+    private var voiceLevelAnimator: android.animation.ValueAnimator? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -145,6 +157,7 @@ class MainActivity : AppCompatActivity() {
         bindRemoteKeys()
         setupTouchpad()
         setupKeyboard()
+        setupVoice()
         updateHeader()
         runCatching {
             getSystemService(ConnectivityManager::class.java).registerNetworkCallback(
@@ -703,6 +716,116 @@ class MainActivity : AppCompatActivity() {
         bindAppShortcuts()
     }
 
+    private fun setupVoice() {
+        voice = VoiceController(this)
+        voice.listener = object : VoiceController.Listener {
+            override fun onListening(active: Boolean) {
+                binding.voiceHint.text = getString(if (active) R.string.voice_listening else R.string.voice_hold)
+                binding.voiceHint.setTextColor(getColor(if (active) R.color.neon_teal else R.color.text_faint))
+                binding.voiceLabel.text = getString(if (active) R.string.voice_listening else R.string.voice)
+                binding.voiceLabel.setTextColor(getColor(if (active) R.color.neon_teal else R.color.text_faint))
+                binding.btnVoice.iconTint = getColorStateList(if (active) R.color.neon_teal else R.color.neon_teal)
+                if (active) pulseVoiceWave(true) else pulseVoiceWave(false)
+            }
+            override fun onLevel(level: Float) {
+                binding.voiceWave.scaleY = 0.55f + level * 0.9f
+                binding.voiceWave.scaleX = 0.9f + level * 0.2f
+            }
+            override fun onPcm(samples: ByteArray) {
+                if (!voiceStreaming) return
+                ioExecutor.execute {
+                    val result = router.sendVoicePcm(samples)
+                    if (result is TransmitResult.Failed) mainHandler.post { onResult(result) }
+                }
+            }
+            override fun onDictation(text: String) {
+                snack(getString(R.string.voice_sent_fmt, text))
+                sendTextToTv(listOf(text))
+            }
+            override fun onError(message: String) = snack(message)
+        }
+        val hold = android.view.View.OnTouchListener { v, event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    ButtonHaptics.vibrate(this)
+                    beginVoice()
+                    true
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    endVoice()
+                    v.performClick()
+                    true
+                }
+                else -> false
+            }
+        }
+        binding.btnVoice.setOnTouchListener(hold)
+        binding.voiceBar.setOnTouchListener(hold)
+    }
+
+    private fun pulseVoiceWave(on: Boolean) {
+        voiceLevelAnimator?.cancel()
+        if (!on) {
+            binding.voiceWave.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+            binding.voiceWave.alpha = 1f
+            return
+        }
+        voiceLevelAnimator = android.animation.ValueAnimator.ofFloat(0.7f, 1f).apply {
+            duration = 500
+            repeatMode = android.animation.ValueAnimator.REVERSE
+            repeatCount = android.animation.ValueAnimator.INFINITE
+            addUpdateListener { binding.voiceWave.alpha = it.animatedValue as Float }
+            start()
+        }
+    }
+
+    private fun beginVoice() {
+        if (!requireConnection()) return
+        if (!voice.hasMicPermission()) {
+            micPermissionRequest.launch(android.Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        startVoiceSession()
+    }
+
+    private fun startVoiceSession() {
+        if (!isConnected()) return
+        if (router.supportsVoice()) {
+            // Google TV: open Assistant, then stream PCM from the phone mic
+            ioExecutor.execute {
+                val started = router.startVoice()
+                mainHandler.post {
+                    if (started is TransmitResult.Failed) {
+                        onResult(started)
+                        // Fall back to on-device dictation so the user still gets something
+                        voiceStreaming = false
+                        voice.startDictation()
+                    } else {
+                        voiceStreaming = true
+                        voice.startStreaming()
+                    }
+                }
+            }
+        } else {
+            // Samsung / LG / Roku / Bluetooth / IR: dictate on the phone, type into the TV
+            voiceStreaming = false
+            voice.startDictation()
+        }
+    }
+
+    private fun endVoice() {
+        if (voiceStreaming) {
+            voiceStreaming = false
+            voice.stopStreaming()
+            ioExecutor.execute {
+                val result = router.endVoice()
+                mainHandler.post { if (result is TransmitResult.Failed) onResult(result) }
+            }
+        } else {
+            voice.stopDictation()
+        }
+    }
+
     private fun bindAppShortcuts() {
         listOf(
             binding.btnNetflix to TvApp.NETFLIX,
@@ -1073,6 +1196,8 @@ class MainActivity : AppCompatActivity() {
         promptDialog?.dismiss()
         sheet?.dismiss()
         runCatching { getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(wifiCallback) }
+        if (::voice.isInitialized) voice.release()
+        voiceLevelAnimator?.cancel()
         bluetooth.stop()
         ioExecutor.shutdownNow()
         scanExecutor.shutdownNow()

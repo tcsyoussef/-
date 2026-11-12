@@ -15,6 +15,12 @@ interface RemoteSession {
         TransmitResult.Failed("${tv.protocol.displayName} does not support typing")
     fun launchApp(app: TvApp): TransmitResult =
         TransmitResult.Failed("${app.label} isn't available on ${tv.protocol.displayName}")
+
+    /** True when this session can stream mic audio (Google TV Assistant). */
+    val supportsVoice: Boolean get() = false
+    fun startVoice(): TransmitResult = TransmitResult.Failed("Voice search isn't available on ${tv.protocol.displayName}")
+    fun sendVoicePcm(samples: ByteArray): TransmitResult = startVoice()
+    fun endVoice(): TransmitResult = TransmitResult.NETWORK_SENT
     fun inputSources(): List<InputSource> = listOf(InputSource.INPUT_MENU)
     fun selectInput(source: InputSource): TransmitResult =
         if (source == InputSource.INPUT_MENU) send(RemoteCommand.INPUT)

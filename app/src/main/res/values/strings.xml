@@ -35,6 +35,12 @@
     <string name="app_opening_fmt">Opening %1$s…</string>
     <string name="app_need_wifi">Connect over Wi‑Fi to open apps on the TV</string>
     <string name="mute">Mute</string>
+    <string name="voice">Voice</string>
+    <string name="voice_hold">Hold to talk to your TV</string>
+    <string name="voice_listening">Listening… speak now</string>
+    <string name="voice_need_mic">Allow microphone access to use voice search</string>
+    <string name="voice_need_connection">Connect to your TV first to use voice search</string>
+    <string name="voice_sent_fmt">Heard: %1$s</string>
     <string name="vol">VOL</string>
     <string name="vol_up">Volume up</string>
     <string name="vol_down">Volume down</string>

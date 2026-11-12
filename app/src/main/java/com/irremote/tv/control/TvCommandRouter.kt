@@ -51,6 +51,17 @@ class TvCommandRouter(
         return target.launchApp(app)
     }
 
+    fun supportsVoice(): Boolean = target()?.let { it.isReady && it.supportsVoice } ?: false
+
+    fun startVoice(): TransmitResult =
+        target()?.startVoice() ?: TransmitResult.Failed("Connect to a TV first")
+
+    fun sendVoicePcm(samples: ByteArray): TransmitResult =
+        target()?.sendVoicePcm(samples) ?: TransmitResult.Failed("Connect to a TV first")
+
+    fun endVoice(): TransmitResult =
+        target()?.endVoice() ?: TransmitResult.NETWORK_SENT
+
     fun inputSources(): List<InputSource> = when (link) {
         ControlLink.IR -> listOf(InputSource.INPUT_MENU)
         else -> target()?.inputSources().orEmpty()

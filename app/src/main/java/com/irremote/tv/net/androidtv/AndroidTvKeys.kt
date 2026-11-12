@@ -7,6 +7,8 @@ object AndroidTvKeys {
     const val KEYCODE_ENTER = 66
     const val KEYCODE_DEL = 67
     const val KEYCODE_TV_INPUT = 178
+    const val KEYCODE_SEARCH = 84
+    const val KEYCODE_VOICE_ASSIST = 231
 
     /** KEYCODE_F3: opens the Google TV launcher's Inputs panel; most TVs ignore KEYCODE_TV_INPUT from the remote service. */
     const val KEYCODE_INPUTS_PANEL = 133

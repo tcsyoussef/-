@@ -46,6 +46,11 @@ class WifiRemoteManager(
 
     override fun launchApp(app: TvApp): TransmitResult = withRecovery { it.launchApp(app) }
 
+    override val supportsVoice: Boolean get() = session?.supportsVoice == true
+    override fun startVoice(): TransmitResult = withRecovery { it.startVoice() }
+    override fun sendVoicePcm(samples: ByteArray): TransmitResult = withRecovery { it.sendVoicePcm(samples) }
+    override fun endVoice(): TransmitResult = withRecovery { it.endVoice() }
+
     override val inputKeyReliable: Boolean get() = session?.tv?.protocol != TvProtocol.ANDROID_TV
 
     @Volatile private var inputHelper: HaierSession? = null
