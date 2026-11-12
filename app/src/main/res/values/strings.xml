@@ -47,6 +47,8 @@
     <string name="wifi_scan_none">No Haier TV found on this network. Enter the IP from TV Network settings.</string>
     <string name="wifi_scan_found">Found %1$d device(s). Tap one to connect.</string>
     <string name="wifi_connecting">Connecting…</string>
+    <string name="wifi_need_ip">Tap Scan first, or type the TV IP address</string>
+    <string name="wifi_connect_failed_fmt">Wi‑Fi connect failed: %1$s</string>
     <string name="need_wifi_connect">Connect to your TV over Wi‑Fi first</string>
     <string name="status_wifi_mode">Wi‑Fi mode — no IR blaster required</string>
     <string-array name="tv_brands">

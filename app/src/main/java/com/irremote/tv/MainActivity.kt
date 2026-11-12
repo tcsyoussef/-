@@ -41,6 +41,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var runner: IrCommandRunner
     private var selectedBrand: TvBrand = TvBrand.HAIER
     private var warnedMissingIr = false
+    private var lastScannedDevices: List<WifiTvDevice> = emptyList()
 
     private val keyboardNavigator = TvKeyboardNavigator()
     private val hardwarePointer = PointerController(stepPixels = 36f, minIntervalMs = 70L)
@@ -171,7 +172,14 @@ class MainActivity : AppCompatActivity() {
         val wifi = binding.wifiInclude
         wifi.btnWifiConnect.setOnClickListener {
             ButtonHaptics.click(it)
-            val ip = wifi.wifiIpInput.text?.toString().orEmpty()
+            val typed = wifi.wifiIpInput.text?.toString()?.trim().orEmpty()
+            val ip = typed.ifEmpty { lastScannedDevices.firstOrNull()?.ip.orEmpty() }
+            if (ip.isEmpty()) {
+                wifi.wifiStatusText.text = getString(R.string.wifi_need_ip)
+                wifi.wifiStatusText.setTextColor(getColor(R.color.accent_amber))
+                return@setOnClickListener
+            }
+            wifi.wifiIpInput.setText(ip)
             connectWifi(ip)
         }
         wifi.btnWifiScan.setOnClickListener {
@@ -192,6 +200,7 @@ class MainActivity : AppCompatActivity() {
                 emptyList()
             }
             mainHandler.post {
+                lastScannedDevices = devices
                 wifi.btnWifiScan.isEnabled = true
                 wifi.wifiDeviceList.removeAllViews()
                 if (devices.isEmpty()) {
@@ -199,6 +208,10 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     wifi.wifiScanResultText.text = getString(R.string.wifi_scan_found, devices.size)
                     devices.forEach { device -> addWifiDeviceRow(device) }
+                    if (devices.size == 1) {
+                        wifi.wifiIpInput.setText(devices[0].ip)
+                        connectWifi(devices[0].ip)
+                    }
                 }
             }
         }
@@ -226,8 +239,11 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, getString(R.string.wifi_connected_fmt, it.displayLabel), Toast.LENGTH_SHORT).show()
                     refreshStatusBanner()
                 }.onFailure {
-                    Toast.makeText(this, it.message ?: "Connect failed", Toast.LENGTH_LONG).show()
+                    val reason = it.message ?: "Connect failed"
+                    Toast.makeText(this, reason, Toast.LENGTH_LONG).show()
                     refreshStatusBanner()
+                    binding.wifiInclude.wifiStatusText.text = getString(R.string.wifi_connect_failed_fmt, reason)
+                    binding.wifiInclude.wifiStatusText.setTextColor(getColor(R.color.accent_red))
                 }
             }
         }

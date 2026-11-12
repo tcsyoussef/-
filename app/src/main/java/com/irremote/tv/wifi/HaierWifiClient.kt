@@ -41,17 +41,34 @@ class HaierWifiClient(
             return Result.failure(IllegalArgumentException("Enter a valid IPv4 address"))
         }
         return try {
-            val xml = getDdXml(cleaned, timeoutMs)
-            val name = extractTag(xml, "friendlyName") ?: "Haier TV"
-            val model = extractTag(xml, "modelName") ?: ""
-            val commandPort = detectCommandPort(cleaned)
-                ?: return Result.failure(
+            var xml: String? = null
+            var discoverError: Exception? = null
+            repeat(3) {
+                if (xml != null) return@repeat
+                try {
+                    xml = getDdXml(cleaned, timeoutMs)
+                } catch (error: Exception) {
+                    discoverError = error
+                }
+            }
+            val openPort = detectCommandPort(cleaned)
+            if (xml == null && openPort == null) {
+                connected.set(null)
+                return Result.failure(
                     IllegalStateException(
-                        "TV found on $cleaned:$discoverPort but command port ${commandPorts.joinToString("/")} is closed. Enable SmartCenter / network remote on the TV."
+                        "Cannot reach TV at $cleaned (${discoverError?.message ?: "no response"}). " +
+                            "Check the TV is on and on the same Wi‑Fi."
                     )
                 )
-            // Wake SmartCenter app (GET) — required on many Haier firmwares before POST works
-            wakeSmartCenter(cleaned, commandPort)
+            }
+            val name = xml?.let { extractTag(it, "friendlyName") } ?: "Haier TV"
+            val model = xml?.let { extractTag(it, "modelName") } ?: ""
+            // Slow TVs can miss the port check; send() retries every port, so don't fail here
+            val commandPort = openPort ?: commandPorts.first()
+            if (openPort == null) {
+                Log.w(TAG, "No command port answered yet on $cleaned — connecting with :$commandPort")
+            }
+            runCatching { wakeSmartCenter(cleaned, commandPort) }
             val accepted = runCatching { postKey(cleaned, KEY_INFO, commandPort) }.getOrDefault(false)
             if (!accepted) {
                 Log.w(
@@ -87,13 +104,13 @@ class HaierWifiClient(
             runCatching { getDdXml(device.ip, 2000) }
             wakeSmartCenter(device.ip, device.portCommand)
 
-            var ok = postKey(device.ip, code, device.portCommand)
+            var ok = tryPostKey(device.ip, code, device.portCommand)
             if (!ok) {
                 for (alt in commandPorts) {
                     if (alt == device.portCommand) continue
-                    if (!isPortOpen(device.ip, alt, 500)) continue
-                    wakeSmartCenter(device.ip, alt)
-                    if (postKey(device.ip, code, alt)) {
+                    if (!isPortOpen(device.ip, alt, 1500)) continue
+                    runCatching { wakeSmartCenter(device.ip, alt) }
+                    if (tryPostKey(device.ip, code, alt)) {
                         connected.set(device.copy(portCommand = alt))
                         ok = true
                         break
@@ -101,10 +118,10 @@ class HaierWifiClient(
                 }
             }
             if (!ok) {
-                getDdXml(device.ip, 2000)
+                runCatching { getDdXml(device.ip, 2000) }
                 val port = connected.get()?.portCommand ?: device.portCommand
-                wakeSmartCenter(device.ip, port)
-                ok = postKey(device.ip, code, port)
+                runCatching { wakeSmartCenter(device.ip, port) }
+                ok = tryPostKey(device.ip, code, port)
             }
             if (!ok) {
                 val status = lastHttpStatus.get()
@@ -129,10 +146,18 @@ class HaierWifiClient(
         }
     }
 
+    private fun tryPostKey(ip: String, keyCode: Int, port: Int): Boolean =
+        try {
+            postKey(ip, keyCode, port)
+        } catch (error: Exception) {
+            lastErrorDetail.set(error.message ?: error.javaClass.simpleName)
+            false
+        }
+
     fun probe(ip: String, timeoutMs: Int = 900): WifiTvDevice? {
         return try {
             val xml = getDdXml(ip, timeoutMs)
-            val commandPort = detectCommandPort(ip) ?: 56789
+            val commandPort = detectCommandPort(ip, 800) ?: commandPorts.first()
             WifiTvDevice(
                 ip = ip,
                 name = extractTag(xml, "friendlyName") ?: "Haier TV",
@@ -144,9 +169,9 @@ class HaierWifiClient(
         }
     }
 
-    fun detectCommandPort(ip: String): Int? {
+    fun detectCommandPort(ip: String, timeoutMs: Int = 1500): Int? {
         for (port in commandPorts) {
-            if (isPortOpen(ip, port, 600)) return port
+            if (isPortOpen(ip, port, timeoutMs)) return port
         }
         return null
     }

@@ -66,6 +66,52 @@ class HaierWifiClientIntegrationTest {
     }
 
     @Test
+    fun connect_succeedsWhenTvDiscoveredButCommandPortSlowOrClosed() {
+        val closedPort = java.net.ServerSocket(0).use { it.localPort }
+        val lenient = HaierWifiClient(
+            discoverPort = server.discoverPort,
+            commandPorts = intArrayOf(closedPort, server.commandPort)
+        )
+        // Only the closed port is known at connect; real port is found on send
+        val onlyClosed = HaierWifiClient(
+            discoverPort = server.discoverPort,
+            commandPorts = intArrayOf(closedPort)
+        )
+        val result = onlyClosed.connect("127.0.0.1")
+        assertTrue("connect failed: ${result.exceptionOrNull()?.message}", result.isSuccess)
+        assertTrue(onlyClosed.isConnected)
+
+        assertTrue(lenient.connect("127.0.0.1").isSuccess)
+        assertTrue(lenient.send(RemoteCommand.POWER) is TransmitResult.Sent)
+    }
+
+    @Test
+    fun send_fallsBackToSecondPortWhenFirstRefuses() {
+        val closedPort = java.net.ServerSocket(0).use { it.localPort }
+        val c = HaierWifiClient(
+            discoverPort = server.discoverPort,
+            commandPorts = intArrayOf(closedPort, server.commandPort)
+        )
+        assertTrue(c.connect("127.0.0.1").isSuccess)
+        // Force the stale port, as if it answered at connect time and then stopped
+        val field = HaierWifiClient::class.java.getDeclaredField("connected").apply { isAccessible = true }
+        @Suppress("UNCHECKED_CAST")
+        val ref = field.get(c) as java.util.concurrent.atomic.AtomicReference<WifiTvDevice?>
+        ref.set(ref.get()!!.copy(portCommand = closedPort))
+        assertTrue(c.send(RemoteCommand.HOME) is TransmitResult.Sent)
+        assertEquals(server.commandPort, c.device?.portCommand)
+    }
+
+    @Test
+    fun connect_failsWhenNothingReachable() {
+        val closed1 = java.net.ServerSocket(0).use { it.localPort }
+        val closed2 = java.net.ServerSocket(0).use { it.localPort }
+        val c = HaierWifiClient(discoverPort = closed1, commandPorts = intArrayOf(closed2))
+        assertTrue(c.connect("127.0.0.1").isFailure)
+        assertEquals(false, c.isConnected)
+    }
+
+    @Test
     fun postKey_acceptsHttp404LikeSomeVestelFirmwares() {
         server.setCommandStatus(404)
         assertTrue(client.postKey("127.0.0.1", 1012, server.commandPort))
