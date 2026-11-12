@@ -83,9 +83,14 @@ class AndroidTvProtocolTest {
             for (command in listOf(RemoteCommand.HOME, RemoteCommand.INPUT, RemoteCommand.MENU, RemoteCommand.OK)) {
                 assertTrue(wifi.send(command) is TransmitResult.Sent)
             }
-            assertTrue(wifi.sendText("hi") is TransmitResult.Sent)
-            waitFor { tv.keyCodes.size >= 6 }
-            assertEquals(listOf(3, 178, 82, 23, 36, 37), tv.keyCodes.toList())
+            // Digits go as key presses; letters must use the IME channel (Google TV ignores letter keys)
+            assertTrue(wifi.sendText("4") is TransmitResult.Sent)
+            assertTrue(wifi.sendText("h") is TransmitResult.Sent)
+            assertTrue(wifi.sendText("\b") is TransmitResult.Sent)
+            assertTrue(wifi.selectInput(com.irremote.tv.control.InputSource.HDMI2) is TransmitResult.Sent)
+            waitFor { tv.keyCodes.size >= 7 && tv.batchTexts.isNotEmpty() }
+            assertEquals(listOf(3, 178, 82, 23, 11, 67, 244), tv.keyCodes.toList())
+            assertEquals(listOf("h"), tv.batchTexts.toList())
 
             // Reconnect with saved cert: no pairing needed
             wifi.disconnect()

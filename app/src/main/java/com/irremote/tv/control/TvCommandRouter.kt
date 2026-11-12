@@ -29,6 +29,17 @@ class TvCommandRouter(
         return target.send(command)
     }
 
+    fun inputSources(): List<InputSource> = when (link) {
+        ControlLink.IR -> listOf(InputSource.INPUT_MENU)
+        else -> target()?.inputSources().orEmpty()
+    }
+
+    fun selectInput(brand: TvBrand, source: InputSource): TransmitResult {
+        if (link == ControlLink.IR) return ir.transmit(brand, RemoteCommand.INPUT)
+        val target = target() ?: return TransmitResult.Failed("Not connected")
+        return target.selectInput(source)
+    }
+
     fun supportsText(): Boolean = target()?.let { it.isReady && it.supportsText } ?: false
 
     fun sendText(text: String): TransmitResult =

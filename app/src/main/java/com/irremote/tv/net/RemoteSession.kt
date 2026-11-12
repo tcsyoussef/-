@@ -1,5 +1,6 @@
 package com.irremote.tv.net
 
+import com.irremote.tv.control.InputSource
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
 
@@ -11,6 +12,10 @@ interface RemoteSession {
     fun send(command: RemoteCommand): TransmitResult
     fun sendText(text: String): TransmitResult =
         TransmitResult.Failed("${tv.protocol.displayName} does not support typing")
+    fun inputSources(): List<InputSource> = listOf(InputSource.INPUT_MENU)
+    fun selectInput(source: InputSource): TransmitResult =
+        if (source == InputSource.INPUT_MENU) send(RemoteCommand.INPUT)
+        else TransmitResult.Failed("${source.label} isn't available on this TV")
     fun close()
 }
 

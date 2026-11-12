@@ -1,6 +1,7 @@
 package com.irremote.tv.net.androidtv
 
 import android.util.Log
+import com.irremote.tv.control.InputSource
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
 import com.irremote.tv.net.DiscoveredTv
@@ -27,6 +28,9 @@ class AndroidTvSession(
     @Volatile private var ready = false
     @Volatile private var imeCounter = 0L
     @Volatile private var imeFieldCounter = 0L
+    @Volatile private var hasImeCounter = false
+    @Volatile private var hasImeFieldCounter = false
+    @Volatile private var imeSeen = false
     private val writeLock = Any()
 
     override val isOpen: Boolean get() = socket?.isClosed == false && ready
@@ -101,16 +105,24 @@ class AndroidTvSession(
             }
             msg.has(20) -> {
                 val inject = msg.message(20) ?: ProtoMessage.EMPTY
-                imeCounter = inject.message(1)?.varint(1) ?: imeCounter
-                imeFieldCounter = inject.message(2)?.varint(1) ?: imeFieldCounter
+                imeCounter = inject.message(1)?.varint(1) ?: 0L
+                imeFieldCounter = inject.message(2)?.varint(1) ?: 0L
+                hasImeCounter = imeCounter != 0L
+                hasImeFieldCounter = imeFieldCounter != 0L
+                imeSeen = true
             }
             msg.has(22) -> {
-                imeFieldCounter = msg.message(22)?.message(2)?.varint(1) ?: imeFieldCounter
+                msg.message(22)?.message(2)?.varint(1)?.let {
+                    imeFieldCounter = it
+                    hasImeFieldCounter = true
+                }
+                imeSeen = true
             }
             msg.has(21) -> {
                 val edit = msg.message(21) ?: ProtoMessage.EMPTY
-                if (imeCounter == 0L) imeCounter = edit.varint(1) ?: 0L
-                if (imeFieldCounter == 0L) imeFieldCounter = edit.varint(2) ?: 0L
+                if (!hasImeCounter) imeCounter = edit.varint(1) ?: imeCounter
+                if (!hasImeFieldCounter) imeFieldCounter = edit.varint(2) ?: imeFieldCounter
+                imeSeen = true
             }
         }
     }
@@ -143,32 +155,37 @@ class AndroidTvSession(
     override fun sendText(text: String): TransmitResult {
         if (text == "\b") return sendKeyCode(AndroidTvKeys.KEYCODE_DEL)
         if (text == "\n") return sendKeyCode(AndroidTvKeys.KEYCODE_ENTER)
-        if (imeCounter == 0L && imeFieldCounter == 0L) {
-            // No focused text field reported yet — type with key events instead
+        // Google TV drops injected letter key events in text fields; only digits survive as keys.
+        // Text therefore goes through the IME channel unless it is all digits and no field was reported.
+        if (!imeSeen && text.all { it in '0'..'9' }) {
             for (ch in text) {
-                val code = AndroidTvKeys.keyCodeForChar(ch)
-                    ?: return TransmitResult.Failed("Can't type '$ch' with key events")
-                val result = sendKeyCode(code)
+                val result = sendKeyCode(AndroidTvKeys.keyCodeForChar(ch)!!)
                 if (result is TransmitResult.Failed) return result
             }
             return TransmitResult.NETWORK_SENT
         }
         return try {
             ensureOpen()
-            write(ProtoWriter().message(21, ProtoWriter()
-                .varint(1, imeCounter)
-                .varint(2, imeFieldCounter)
-                .message(3, ProtoWriter()
-                    .varint(1, 1)
-                    .message(2, ProtoWriter()
-                        .varint(1, text.length)
-                        .varint(2, text.length)
-                        .string(3, text)))))
+            write(imeBatchEdit(imeCounter, imeFieldCounter, text))
             TransmitResult.NETWORK_SENT
         } catch (error: Exception) {
             TransmitResult.Failed("Android TV typing failed: ${error.message}")
         }
     }
+
+    override fun inputSources(): List<InputSource> = InputSource.entries
+
+    override fun selectInput(source: InputSource): TransmitResult = sendKeyCode(
+        when (source) {
+            InputSource.INPUT_MENU -> AndroidTvKeys.KEYCODE_TV_INPUT
+            InputSource.HDMI1 -> 243
+            InputSource.HDMI2 -> 244
+            InputSource.HDMI3 -> 245
+            InputSource.HDMI4 -> 246
+            InputSource.TV -> 170
+            InputSource.SETTINGS -> 176
+        }
+    )
 
     override fun close() {
         ready = false
@@ -178,6 +195,17 @@ class AndroidTvSession(
 
     companion object {
         private const val TAG = "AndroidTvSession"
+
+        fun imeBatchEdit(imeCounter: Long, fieldCounter: Long, text: String): ProtoWriter =
+            ProtoWriter().message(21, ProtoWriter()
+                .varint(1, imeCounter)
+                .varint(2, fieldCounter)
+                .message(3, ProtoWriter()
+                    .varint(1, 1)
+                    .message(2, ProtoWriter()
+                        .varint(1, text.length)
+                        .varint(2, text.length)
+                        .string(3, text))))
         private const val DIRECTION_SHORT = 3
         // PING | KEY | IME | POWER | VOLUME | APP_LINK
         const val OUR_FEATURES = 1L or 2L or 4L or 32L or 64L or 512L

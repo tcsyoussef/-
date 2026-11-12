@@ -6,6 +6,7 @@ import com.irremote.tv.ir.RemoteCommand
 object AndroidTvKeys {
     const val KEYCODE_ENTER = 66
     const val KEYCODE_DEL = 67
+    const val KEYCODE_TV_INPUT = 178
 
     fun keyCode(command: RemoteCommand): Int = when (command) {
         RemoteCommand.POWER -> 26

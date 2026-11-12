@@ -15,4 +15,11 @@ interface RemoteTarget {
     fun send(command: RemoteCommand): TransmitResult
     fun sendText(text: String): TransmitResult =
         TransmitResult.Failed("Typing is not supported on this connection")
+
+    /** Sources offered in the Input picker; an empty list means Input switching isn't possible. */
+    fun inputSources(): List<InputSource> = listOf(InputSource.INPUT_MENU)
+
+    fun selectInput(source: InputSource): TransmitResult =
+        if (source == InputSource.INPUT_MENU) send(RemoteCommand.INPUT)
+        else TransmitResult.Failed("${source.label} isn't available on this TV")
 }

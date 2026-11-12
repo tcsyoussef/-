@@ -2,6 +2,7 @@ package com.irremote.tv.net.samsung
 
 import android.util.Base64
 import android.util.Log
+import com.irremote.tv.control.InputSource
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
 import com.irremote.tv.net.DiscoveredTv
@@ -147,6 +148,20 @@ class SamsungSession(
                 .put("TypeOfRemote", "SendInputString")
         )
     }
+
+    override fun inputSources(): List<InputSource> = InputSource.entries
+
+    override fun selectInput(source: InputSource): TransmitResult = sendKey(
+        when (source) {
+            InputSource.INPUT_MENU -> "KEY_SOURCE"
+            InputSource.HDMI1 -> "KEY_HDMI1"
+            InputSource.HDMI2 -> "KEY_HDMI2"
+            InputSource.HDMI3 -> "KEY_HDMI3"
+            InputSource.HDMI4 -> "KEY_HDMI4"
+            InputSource.TV -> "KEY_TV"
+            InputSource.SETTINGS -> "KEY_MENU"
+        }
+    )
 
     override fun close() {
         connected = false

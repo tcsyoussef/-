@@ -13,6 +13,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.irremote.tv.control.InputSource
 import com.irremote.tv.control.RemoteTarget
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
@@ -192,6 +193,8 @@ class BluetoothHidRemote(private val context: Context) : RemoteTarget {
         }
         return TransmitResult.NETWORK_SENT
     }
+
+    override fun inputSources(): List<InputSource> = emptyList()
 
     fun moveMouse(dx: Int, dy: Int): Boolean = report(HidReports.ID_MOUSE, HidReports.mouse(0, dx, dy))
 

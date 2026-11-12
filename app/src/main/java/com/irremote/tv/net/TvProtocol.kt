@@ -2,11 +2,11 @@ package com.irremote.tv.net
 
 /** Wi‑Fi control protocols, one per TV platform. */
 enum class TvProtocol(val displayName: String) {
-    ANDROID_TV("Android TV / Google TV"),
-    SAMSUNG("Samsung Tizen"),
-    LG_WEBOS("LG webOS"),
+    ANDROID_TV("Google TV / Android TV"),
+    SAMSUNG("Samsung Smart TV"),
+    LG_WEBOS("LG Smart TV"),
     ROKU("Roku"),
-    HAIER_VESTEL("Haier / Vestel SmartCenter");
+    HAIER_VESTEL("Haier Smart TV");
 
     companion object {
         fun fromName(name: String?): TvProtocol? = entries.firstOrNull { it.name == name }
@@ -20,7 +20,7 @@ data class DiscoveredTv(
     val port: Int = 0
 ) {
     val displayLabel: String
-        get() = "$name · ${protocol.displayName} — $ip"
+        get() = if (name == protocol.displayName) name else "$name · ${protocol.displayName}"
 }
 
 /** Default LAN ports; injectable so tests can point at mock servers. */

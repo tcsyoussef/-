@@ -1,5 +1,6 @@
 package com.irremote.tv.net.roku
 
+import com.irremote.tv.control.InputSource
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
 import com.irremote.tv.net.DiscoveredTv
@@ -43,6 +44,21 @@ class RokuSession(
         }
         return TransmitResult.NETWORK_SENT
     }
+
+    override fun inputSources(): List<InputSource> = listOf(
+        InputSource.HDMI1, InputSource.HDMI2, InputSource.HDMI3, InputSource.HDMI4, InputSource.TV
+    )
+
+    override fun selectInput(source: InputSource): TransmitResult = keypress(
+        when (source) {
+            InputSource.HDMI1 -> "InputHDMI1"
+            InputSource.HDMI2 -> "InputHDMI2"
+            InputSource.HDMI3 -> "InputHDMI3"
+            InputSource.HDMI4 -> "InputHDMI4"
+            InputSource.TV -> "InputTuner"
+            else -> "Home"
+        }
+    )
 
     override fun close() = Unit
 

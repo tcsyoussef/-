@@ -1,6 +1,7 @@
 package com.irremote.tv.net
 
 import android.util.Log
+import com.irremote.tv.control.InputSource
 import com.irremote.tv.control.RemoteTarget
 import com.irremote.tv.ir.RemoteCommand
 import com.irremote.tv.ir.TransmitResult
@@ -43,6 +44,11 @@ class WifiRemoteManager(
 
     override fun sendText(text: String): TransmitResult =
         session?.sendText(text) ?: TransmitResult.Failed("Connect to a TV in the Wi‑Fi panel first")
+
+    override fun inputSources(): List<InputSource> = session?.inputSources().orEmpty()
+
+    override fun selectInput(source: InputSource): TransmitResult =
+        session?.selectInput(source) ?: TransmitResult.Failed("Connect to a TV first")
 
     fun disconnect() {
         session?.close()
