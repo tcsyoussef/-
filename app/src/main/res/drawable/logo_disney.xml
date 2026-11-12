@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="40dp"
+    android:height="24dp"
+    android:viewportWidth="40"
+    android:viewportHeight="24">
+    <!-- Simple D+ mark that reads clearly at tile size -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M6,4h7.2c4.4,0 7.3,2.6 7.3,8 0,5.4 -2.9,8 -7.3,8H6V4zM9.2,7.1v9.8h3.7c2.5,0 4,-1.6 4,-4.9 0,-3.3 -1.5,-4.9 -4,-4.9H9.2z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28.2,10.2h5.6v2.4h-5.6zM30.8,7.6h2.4v7.6h-2.4z" />
+</vector>

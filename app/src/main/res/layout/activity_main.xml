@@ -1,0 +1,655 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_window"
+    android:orientation="vertical">
+
+    <!-- Header: which TV + one Connect / Disconnect button -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="12dp">
+
+        <LinearLayout
+            android:id="@+id/statusArea"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:orientation="vertical"
+            android:paddingVertical="4dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/statusDot"
+                    android:layout_width="9dp"
+                    android:layout_height="9dp"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/bg_status_dot"
+                    app:tint="@color/text_faint" />
+
+                <TextView
+                    android:id="@+id/statusLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/status_not_connected"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:text="@string/no_tv"
+                android:textColor="@color/text_primary"
+                android:textSize="22sp" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnConnection"
+            style="@style/PrimaryButton"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="12dp"
+            android:paddingHorizontal="18dp"
+            android:text="@string/connect"
+            android:textSize="15sp"
+            app:cornerRadius="24dp"
+            app:icon="@drawable/ic_link"
+            app:iconSize="20dp" />
+    </LinearLayout>
+
+    <!-- Page tabs -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:background="@drawable/bg_tabs"
+        android:padding="4dp">
+
+        <LinearLayout
+            android:id="@+id/pageTabs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tabRemote"
+                style="@style/TabButton"
+                android:text="@string/tab_remote"
+                app:icon="@drawable/ic_remote" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tabTouchpad"
+                style="@style/TabButton"
+                android:text="@string/tab_touchpad"
+                app:icon="@drawable/ic_mouse" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tabKeyboard"
+                style="@style/TabButton"
+                android:text="@string/tab_keyboard"
+                app:icon="@drawable/ic_keyboard" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tabNumbers"
+                style="@style/TabButton"
+                android:text="@string/tab_numbers"
+                app:icon="@drawable/ic_dialpad" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true"
+        android:overScrollMode="never">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="28dp">
+
+            <!-- ============ Remote page ============ -->
+            <LinearLayout
+                android:id="@+id/pageRemote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPower"
+                        style="@style/RoundKey.Power"
+                        android:contentDescription="@string/power"
+                        app:icon="@drawable/ic_power" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnMute"
+                        style="@style/RoundKey"
+                        android:layout_marginEnd="12dp"
+                        android:contentDescription="@string/mute"
+                        app:icon="@drawable/ic_mute" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnInput"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/input"
+                        app:icon="@drawable/ic_input" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="280dp"
+                    android:layout_height="280dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/bg_dpad_ring">
+
+                    <ImageButton
+                        android:id="@+id/btnUp"
+                        style="@style/DpadArrow"
+                        android:layout_gravity="top|center_horizontal"
+                        android:contentDescription="@string/up"
+                        android:padding="22dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_up" />
+
+                    <ImageButton
+                        android:id="@+id/btnDown"
+                        style="@style/DpadArrow"
+                        android:layout_gravity="bottom|center_horizontal"
+                        android:contentDescription="@string/down"
+                        android:padding="22dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_down" />
+
+                    <ImageButton
+                        android:id="@+id/btnLeft"
+                        style="@style/DpadArrow"
+                        android:layout_gravity="start|center_vertical"
+                        android:contentDescription="@string/left"
+                        android:padding="22dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_left" />
+
+                    <ImageButton
+                        android:id="@+id/btnRight"
+                        style="@style/DpadArrow"
+                        android:layout_gravity="end|center_vertical"
+                        android:contentDescription="@string/right"
+                        android:padding="22dp"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/ic_right" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnOk"
+                        style="@style/Widget.MaterialComponents.Button.UnelevatedButton"
+                        android:layout_width="100dp"
+                        android:layout_height="100dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_ok"
+                        android:fontFamily="@font/inter_semibold"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:text="@string/ok"
+                        android:textAllCaps="true"
+                        android:textColor="@color/text_primary"
+                        android:textSize="20sp"
+                        app:backgroundTint="@null"
+                        app:cornerRadius="50dp" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnBack"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/back"
+                        app:icon="@drawable/ic_back" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnHome"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/home"
+                        app:icon="@drawable/ic_home" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnMenu"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/menu"
+                        app:icon="@drawable/ic_menu" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="28dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="76dp"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_rocker"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingVertical="4dp">
+
+                        <ImageButton
+                            android:id="@+id/btnVolUp"
+                            style="@style/RockerButton"
+                            android:contentDescription="@string/vol_up"
+                            android:src="@drawable/ic_add" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingVertical="6dp"
+                            android:text="@string/vol"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp" />
+
+                        <ImageButton
+                            android:id="@+id/btnVolDown"
+                            style="@style/RockerButton"
+                            android:contentDescription="@string/vol_down"
+                            android:src="@drawable/ic_remove" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:orientation="vertical">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnVoice"
+                            style="@style/RoundKey"
+                            android:contentDescription="@string/voice"
+                            app:icon="@drawable/ic_mic"
+                            app:iconTint="@color/neon_teal" />
+
+                        <TextView
+                            android:id="@+id/voiceLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:text="@string/voice"
+                            android:textColor="@color/text_faint"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="76dp"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_rocker"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical"
+                        android:paddingVertical="4dp">
+
+                        <ImageButton
+                            android:id="@+id/btnChUp"
+                            style="@style/RockerButton"
+                            android:contentDescription="@string/ch_up"
+                            android:src="@drawable/ic_up" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingVertical="6dp"
+                            android:text="@string/ch"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp" />
+
+                        <ImageButton
+                            android:id="@+id/btnChDown"
+                            style="@style/RockerButton"
+                            android:contentDescription="@string/ch_down"
+                            android:src="@drawable/ic_down" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Platform shortcuts: Netflix, YouTube, Disney+, … -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="28dp"
+                    android:clipToPadding="false"
+                    android:overScrollMode="never"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/appRow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="4dp">
+
+                        <ImageButton
+                            android:id="@+id/btnNetflix"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/tile_netflix"
+                            android:contentDescription="@string/app_netflix"
+                            android:padding="18dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_netflix" />
+
+                        <ImageButton
+                            android:id="@+id/btnYoutube"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/tile_youtube"
+                            android:contentDescription="@string/app_youtube"
+                            android:padding="16dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_youtube" />
+
+                        <ImageButton
+                            android:id="@+id/btnDisney"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/tile_disney"
+                            android:contentDescription="@string/app_disney"
+                            android:padding="12dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_disney" />
+
+                        <ImageButton
+                            android:id="@+id/btnPrime"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/tile_prime"
+                            android:contentDescription="@string/app_prime"
+                            android:padding="14dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_prime" />
+
+                        <ImageButton
+                            android:id="@+id/btnSpotify"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:layout_marginEnd="12dp"
+                            android:background="@drawable/tile_spotify"
+                            android:contentDescription="@string/app_spotify"
+                            android:padding="16dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_spotify" />
+
+                        <ImageButton
+                            android:id="@+id/btnShahid"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
+                            android:background="@drawable/tile_shahid"
+                            android:contentDescription="@string/app_shahid"
+                            android:padding="16dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/logo_shahid" />
+                    </LinearLayout>
+                </HorizontalScrollView>
+
+                <LinearLayout
+                    android:id="@+id/voiceBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingVertical="8dp">
+
+                    <View
+                        android:id="@+id/voiceWave"
+                        android:layout_width="160dp"
+                        android:layout_height="48dp"
+                        android:background="@drawable/bg_voice_wave" />
+
+                    <TextView
+                        android:id="@+id/voiceHint"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/voice_hold"
+                        android:textColor="@color/text_faint"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ============ Touchpad page ============ -->
+            <LinearLayout
+                android:id="@+id/pageTouchpad"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <com.irremote.tv.input.TouchpadView
+                    android:id="@+id/touchpadView"
+                    android:layout_width="match_parent"
+                    android:layout_height="340dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPadBack"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/back"
+                        app:icon="@drawable/ic_back" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPadOk"
+                        style="@style/RoundKey.Accent"
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:text="@string/ok"
+                        android:textColor="@color/on_accent"
+                        android:textSize="18sp"
+                        app:cornerRadius="40dp" />
+
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_weight="1" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnPadHome"
+                        style="@style/RoundKey"
+                        android:contentDescription="@string/home"
+                        app:icon="@drawable/ic_home" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ============ Keyboard page ============ -->
+            <LinearLayout
+                android:id="@+id/pageKeyboard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/keyboardHint"
+                    style="@style/BodyText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/keyboard_direct_hint" />
+
+                <LinearLayout
+                    android:id="@+id/directTyping"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="vertical">
+
+                    <EditText
+                        android:id="@+id/typeField"
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:background="@drawable/bg_input_field"
+                        android:drawableStart="@drawable/ic_keyboard"
+                        android:drawablePadding="12dp"
+                        android:drawableTint="@color/text_faint"
+                        android:hint="@string/type_hint"
+                        android:imeOptions="actionSearch|flagNoExtractUi"
+                        android:importantForAutofill="no"
+                        android:inputType="textVisiblePassword|textNoSuggestions"
+                        android:paddingHorizontal="18dp"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_faint"
+                        android:textSize="18sp"
+                        tools:ignore="UnusedAttribute" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnKbDelete"
+                            style="@style/SecondaryButton"
+                            android:layout_width="0dp"
+                            android:layout_marginEnd="6dp"
+                            android:layout_weight="1"
+                            android:text="@string/delete"
+                            app:icon="@drawable/ic_backspace" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnKbEnter"
+                            style="@style/PrimaryButton"
+                            android:layout_width="0dp"
+                            android:layout_marginStart="6dp"
+                            android:layout_weight="1"
+                            android:text="@string/enter"
+                            app:icon="@drawable/ic_send" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/gridTyping"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnResetKeyboardCursor"
+                        style="@style/SecondaryButton"
+                        android:layout_width="match_parent"
+                        android:text="@string/reset_tv_keyboard_cursor"
+                        app:icon="@drawable/ic_refresh" />
+
+                    <GridLayout
+                        android:id="@+id/keyboardGrid"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:columnCount="10" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ============ Numbers page ============ -->
+            <GridLayout
+                android:id="@+id/pageNumbers"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="3"
+                android:visibility="gone">
+
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn1" style="@style/NumKey" android:text="1" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn2" style="@style/NumKey" android:text="2" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn3" style="@style/NumKey" android:text="3" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn4" style="@style/NumKey" android:text="4" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn5" style="@style/NumKey" android:text="5" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn6" style="@style/NumKey" android:text="6" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn7" style="@style/NumKey" android:text="7" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn8" style="@style/NumKey" android:text="8" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn9" style="@style/NumKey" android:text="9" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnNumBack"
+                    style="@style/NumKey"
+                    android:contentDescription="@string/back"
+                    app:icon="@drawable/ic_back"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp"
+                    app:iconTint="@color/text_secondary" />
+
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn0" style="@style/NumKey" android:text="0" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnNumOk"
+                    style="@style/NumKey"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="@string/ok"
+                    android:textColor="@color/on_accent"
+                    android:textSize="18sp"
+                    app:backgroundTint="@color/accent" />
+            </GridLayout>
+        </FrameLayout>
+    </ScrollView>
+</LinearLayout>

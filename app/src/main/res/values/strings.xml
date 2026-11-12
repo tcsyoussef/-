@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TV Remote</string>
+
+    <!-- Header -->
+    <string name="status_not_connected">Not connected</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_wifi_fmt">Wi‑Fi · %1$s</string>
+    <string name="status_bluetooth">Bluetooth</string>
+    <string name="status_ir_fmt">Infrared · %1$s</string>
+    <string name="no_tv">No TV connected</string>
+    <string name="ir_tv_name">Point your phone at the TV</string>
+    <string name="connect">Connect</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="connected_fmt">Connected to %1$s</string>
+    <string name="disconnected">Disconnected</string>
+    <string name="need_connection">Connect to your TV first</string>
+    <string name="reconnect_failed_fmt">Couldn\'t reach %1$s</string>
+
+    <!-- Tabs -->
+    <string name="tab_remote">Remote</string>
+    <string name="tab_touchpad">Touch</string>
+    <string name="tab_keyboard">Type</string>
+    <string name="tab_numbers">123</string>
+
+    <!-- Keys -->
+    <string name="power">Power</string>
+    <string name="input">Input</string>
+    <string name="app_netflix">Netflix</string>
+    <string name="app_youtube">YouTube</string>
+    <string name="app_disney">Disney+</string>
+    <string name="app_prime">Prime Video</string>
+    <string name="app_spotify">Spotify</string>
+    <string name="app_shahid">Shahid</string>
+    <string name="app_opening_fmt">Opening %1$s…</string>
+    <string name="app_need_wifi">Connect over Wi‑Fi to open apps on the TV</string>
+    <string name="mute">Mute</string>
+    <string name="voice">Voice</string>
+    <string name="voice_hold">Hold to talk to your TV</string>
+    <string name="voice_listening">Listening… speak now</string>
+    <string name="voice_need_mic">Allow microphone access to use voice search</string>
+    <string name="voice_need_connection">Connect to your TV first to use voice search</string>
+    <string name="voice_sent_fmt">Heard: %1$s</string>
+    <string name="vol">VOL</string>
+    <string name="vol_up">Volume up</string>
+    <string name="vol_down">Volume down</string>
+    <string name="ch">CH</string>
+    <string name="ch_up">Channel up</string>
+    <string name="ch_down">Channel down</string>
+    <string name="ok">OK</string>
+    <string name="up">Up</string>
+    <string name="down">Down</string>
+    <string name="left">Left</string>
+    <string name="right">Right</string>
+    <string name="home">Home</string>
+    <string name="back">Back</string>
+    <string name="menu">Menu</string>
+
+    <!-- Keyboard -->
+    <string name="keyboard_direct_hint">Open a search box on your TV, then type here. Letters appear on the TV as you type.</string>
+    <string name="keyboard_grid_hint">Open the keyboard on your TV and tap \"Start from first key\". Each letter you tap is typed by moving the TV\'s cursor for you.</string>
+    <string name="type_hint">Type on your TV…</string>
+    <string name="delete">Delete</string>
+    <string name="enter">Enter</string>
+    <string name="reset_tv_keyboard_cursor">Start from first key</string>
+    <string name="typing_busy">Still typing the last letter…</string>
+
+    <!-- Connect sheet -->
+    <string name="connect_title">Connect to your TV</string>
+    <string name="connect_subtitle">Pick how your phone talks to the TV</string>
+    <string name="link_wifi">Wi‑Fi</string>
+    <string name="link_bluetooth">Bluetooth</string>
+    <string name="link_ir">Infrared</string>
+    <string name="wifi_hint">Make sure your phone and TV are on the same Wi‑Fi and the TV is turned on.</string>
+    <string name="wifi_searching">Looking for TVs…</string>
+    <string name="wifi_none">No TV found yet. Turn the TV on and tap Search again, or enter its IP address (TV Settings › Network).</string>
+    <string name="wifi_last_used">Last used</string>
+    <string name="search_again">Search again</string>
+    <string name="enter_ip">Enter TV IP address</string>
+    <string name="ip_hint">e.g. 192.168.1.50</string>
+    <string name="wifi_need_ip">Type the TV\'s IP address</string>
+    <string name="connecting_fmt">Connecting to %1$s…</string>
+    <string name="prompt_title">Check your TV</string>
+    <string name="pin_title">Enter the code on your TV</string>
+    <string name="pin_message">Your TV is showing a 6‑character code. Type it below. You only need to do this once.</string>
+    <string name="pin_hint">Code</string>
+    <string name="pin_pair">Pair</string>
+    <string name="pairing">Pairing…</string>
+    <string name="cancel">Cancel</string>
+
+    <string name="bt_steps">1. On your TV open Settings › Remotes &amp; Accessories (or Bluetooth) › Add device.\n2. Tap \"Make phone visible\" and choose this phone on the TV.\nAlready paired? Just tap your TV below.</string>
+    <string name="bt_make_visible">Make phone visible</string>
+    <string name="bt_paired_label">PAIRED DEVICES</string>
+    <string name="bt_none_paired">No paired devices yet. Pair from your TV first.</string>
+    <string name="bt_unsupported">Bluetooth remote needs Android 9 or newer.</string>
+    <string name="bt_turn_on">Turn on Bluetooth to continue</string>
+    <string name="bt_need_permission">Allow \"Nearby devices\" to use the Bluetooth remote</string>
+    <string name="bt_connected">Connected</string>
+    <string name="bt_paired">Paired</string>
+    <string name="bt_ready">Ready. Choose this phone on your TV.</string>
+
+    <string name="ir_hint">Uses your phone\'s infrared blaster, like a normal remote. Point the top of the phone at the TV.</string>
+    <string name="ir_missing">This phone doesn\'t have an infrared blaster. Use Wi‑Fi or Bluetooth instead.</string>
+    <string name="brand_label">TV BRAND</string>
+    <string name="use_ir">Use infrared</string>
+
+    <string-array name="tv_brands">
+        <item>Haier</item>
+        <item>Haier Alt</item>
+        <item>Samsung</item>
+        <item>LG</item>
+        <item>Sony</item>
+        <item>Panasonic</item>
+        <item>TCL</item>
+        <item>Hisense</item>
+        <item>Sharp</item>
+        <item>Philips</item>
+    </string-array>
+</resources>
